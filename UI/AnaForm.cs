@@ -32,6 +32,7 @@ namespace EcoBuildss.UI
         readonly CheckBox chkSogutma = new() { Text = "Klima ile soğutma var", AutoSize = true, Margin = new Padding(0, 0, 0, 8) };
         readonly NumericUpDown numArtis = new() { Minimum = -5, Maximum = 10, DecimalPlaces = 1, Increment = 0.5m, Value = 0, Width = 80 };
         readonly ComboBox cmbIl = Combo(), cmbBolge = Combo();
+        string dbHatasi = "";
         readonly Label lblIlBilgi = Ipucu(), lblSinirlar = Ipucu();
         bool ilYukleniyor;
         const string OzelOlcuMetni = "Özel ölçü (en × boy × kat)";
@@ -118,6 +119,7 @@ namespace EcoBuildss.UI
             catch (Exception exDb)
             {
                 db = null;
+                dbHatasi = exDb.Message;
                 try { veri = VeriDeposu.Yukle(veriKlasoru); }
                 catch (Exception ex)
                 {
@@ -127,7 +129,7 @@ namespace EcoBuildss.UI
             }
 
             ArayuzKur();
-            Shown += (_, _) => { if (veri != null) IlkAcilisRehberi(); if (db == null && veri != null) Bildir("Veritabanı açılamadı; teklif kaydı bu oturumda kullanılamıyor."); };
+            Shown += (_, _) => { if (veri != null) IlkAcilisRehberi(); if (db == null && veri != null) Bildir($"Veritabanı açılamadı ({dbHatasi}); teklif kaydı bu oturumda kullanılamıyor."); };
             if (veri != null) { KumelemeYap(); Doldur(); hazir = true; OncelikSec(1); KayitlariYenile(); }
         }
 
