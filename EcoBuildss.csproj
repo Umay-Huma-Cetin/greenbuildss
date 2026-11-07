@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>EcoBuildss</AssemblyName>
+    <RootNamespace>EcoBuildss</RootNamespace>
+    <Product>EcoBuildss</Product>
+    <Authors>Umay Hüma Çetin</Authors>
+    <Version>2.0.0</Version>
+    <!-- Arayüz piksel ölçülerle çizildiği için %125/%150 ekranlarda Windows ölçeklesin, yerleşim bozulmasın -->
+    <ApplicationHighDpiMode>DpiUnawareGdiScaled</ApplicationHighDpiMode>
+    <!-- Test projesi bu klasörün içinde ayrı bir proje olarak durur; uygulamaya derlenmez -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);EcoBuildss.Testler\**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- SQLite veritabanı sürücüsü (NuGet; Visual Studio ilk derlemede otomatik indirir) -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Veri\*.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
