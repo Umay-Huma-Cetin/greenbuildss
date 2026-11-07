@@ -9,8 +9,8 @@ M3,Veri seti binalarının çatı U değeri,0.5,W/m²K,"Tsanas, A. ve Xifara, A.
 M4,Veri seti binalarının pencere U değeri,2.26,W/m²K,"Tsanas, A. ve Xifara, A. (2012), Energy and Buildings 49, 560-567"
 M7,Kat yüksekliği,3.5,m,ENB2012 verisinden türetildi
 T6,Rsi + Rse (dış duvar),0.17,m²K/W,"TS 825 (iç 0,13 + dış 0,04)"
-V1,"Hava değişim sayısı nh (uygunluk belgeli pencere, doğal havalandırma)",1.0,1/h,"TS 825 – C. Yılmaz, ME401 Bölüm 3 Binalarda Isı Yalıtım Kuralları (TS 825), Afyon Kocatepe Üniv., 2017"
-V2,"Havalandırılan hacim oranı (Vh = 0,8 · V brüt)",0.8,oran,"TS 825 – C. Yılmaz (2017); H. Yazıcı, Denizli ilinde bir binanın TS 825 hesap yöntemine göre yıllık ısı ihtiyacı"
+V1,"Hava değişim sayısı nh (uygunluk belgeli pencere, doğal havalandırma)",1.0,1/h,"TS 825 – C. Yılmaz, ME401 Bölüm 3 Binalarda Isı Yalıtım Kuralları (TS 825), Afyon Kocatepe Üniv., 2017: uygunluk belgeli pencerede nh = 1 (blog.aku.edu.tr/ceyhunyilmaz/files/2017/02/ME401-Chap_03_lecture.pdf)"
+V2,"Havalandırılan hacim oranı (Vh = 0,8 · V brüt)",0.8,oran,"TS 825 – C. Yılmaz (2017), aynı ders notu: Vh = 0,8·V brüt; İzocam (2013) açıklamalı TS 825 yayınında da Vh = 0,8 × Vbrüt"
 V3,"Havanın hacimsel ısı kapasitesi (HV = 0,33 · nh · Vh)",0.33,Wh/m³K,"TS 825 – Altun, Akçamete, Akgül (2020), Pamukkale Üniv. Müh. Bilim. Derg. 26(6), Denk. 5"
 F1,"Tavan/çatı ısı kaybı düzeltme katsayısı (0,8 · AT · UT)",0.8,oran,"TS 825 – Altun, Akçamete, Akgül (2020), Pamukkale Üniv. Müh. Bilim. Derg. 26(6), Denk. 4b"
 F2,"Zemine oturan döşeme düzeltme katsayısı (0,5 · At · Ut)",0.5,oran,"TS 825 – Altun, Akçamete, Akgül (2020), Pamukkale Üniv. Müh. Bilim. Derg. 26(6), Denk. 4b"
