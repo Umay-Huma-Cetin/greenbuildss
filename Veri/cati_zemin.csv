@@ -1,0 +1,4 @@
+﻿id,kategori,ad,kalinlik_m,lambda_W_mK,fiyat_TL_m2,fiyat_hesabi,fiyat_kaynagi,fiyat_tarihi,teknik_kaynak
+C1,Çatı yalıtımı,"Cam yünü çatı şiltesi (İzocam T-400, 10 cm)",0.1,0.043,75.9552,"729,17 TL + KDV ÷ 9,60 m²/rulo (120 × 800 cm)",izoyapimarket.com – İzocam Camyünü Çatı Şiltesi 10 cm T-400,2026 (erişim Kasım 2026),"λ 0,043 W/mK: İzocam Bina Şiltesi teknik broşürü (Tip 400)"
+C2,Çatı yalıtımı,"Cam yünü çatı şiltesi, çift kat 2 × 10 cm (İzocam T-400)",0.2,0.043,151.9104,"Hesaplanan: 2 × (729,17 TL + KDV ÷ 9,60 m²/rulo); 20 cm için iki kat 10 cm şilte",izoyapimarket.com – İzocam Camyünü Çatı Şiltesi 10 cm T-400,2026 (erişim Kasım 2026),"λ 0,043 W/mK: İzocam Bina Şiltesi teknik broşürü (Tip 400)"
+Z1,Zemin yalıtımı,"XPS levha, çift kat 2 × 5 cm (İzocam Foamboard)",0.1,0.035,451.3889,"2 × (1.300 TL/paket ÷ 5,76 m²/paket); 10 cm için iki kat 5 cm levha",kucukdeveci.com.tr,Haziran 2026,TS 825 Ek E hesap değerleri (İZODER) XPS satırı (≥25 kg/m³)

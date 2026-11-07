@@ -1,0 +1,13 @@
+# Derleme çıktıları
+bin/
+obj/
+*/bin/
+*/obj/
+# Visual Studio
+.vs/
+*.user
+*.suo
+# Çalışma sırasında oluşan dosyalar (teklif veritabanı, malzeme yedekleri)
+*.db
+*.db-journal
+*.yedek

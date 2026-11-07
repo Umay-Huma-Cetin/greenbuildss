@@ -1,0 +1,28 @@
+﻿id,parametre,deger,birim,kaynak
+E1,"Doğalgaz konut fiyatı (BOTAŞ, Kademe-1)",10.625,TL/Sm³,BOTAŞ toptan satış tarifesi
+E2,"Doğalgaz konut fiyatı (BOTAŞ, Kademe-2, limit aşımı)",18.0,TL/Sm³,BOTAŞ toptan satış tarifesi
+E3,Doğalgaz üst ısıl değer (fatura referansı),9155.0,kcal/Sm³,EPDK – Doğal Gaz Dağıtım Şirketlerinin Perakende Satışlarında Fiili Üst Isıl Değerin Uygulanması Hakkında Tebliğ (Md. 4-5)
+E8,Doğalgaz yanma emisyon faktörü,56.1,tCO₂/TJ,"IPCC 2006 Kılavuzu, sabit yanma, Cilt 2 Bölüm 2 Çizelge 2.5 (konut), doğal gaz Tier 1 değeri"
+M1,Veri seti binalarının duvar U değeri,1.78,W/m²K,"Tsanas, A. ve Xifara, A. (2012), Energy and Buildings 49, 560-567"
+M2,Veri seti binalarının döşeme U değeri,0.86,W/m²K,"Tsanas, A. ve Xifara, A. (2012), Energy and Buildings 49, 560-567"
+M3,Veri seti binalarının çatı U değeri,0.5,W/m²K,"Tsanas, A. ve Xifara, A. (2012), Energy and Buildings 49, 560-567"
+M4,Veri seti binalarının pencere U değeri,2.26,W/m²K,"Tsanas, A. ve Xifara, A. (2012), Energy and Buildings 49, 560-567"
+M7,Kat yüksekliği,3.5,m,ENB2012 verisinden türetildi
+T6,Rsi + Rse (dış duvar),0.17,m²K/W,"TS 825 (iç 0,13 + dış 0,04)"
+V1,"Hava değişim sayısı nh (uygunluk belgeli pencere, doğal havalandırma)",1.0,1/h,"TS 825 – C. Yılmaz, ME401 Bölüm 3 Binalarda Isı Yalıtım Kuralları (TS 825), Afyon Kocatepe Üniv., 2017"
+V2,"Havalandırılan hacim oranı (Vh = 0,8 · V brüt)",0.8,oran,"TS 825 – C. Yılmaz (2017); H. Yazıcı, Denizli ilinde bir binanın TS 825 hesap yöntemine göre yıllık ısı ihtiyacı"
+V3,"Havanın hacimsel ısı kapasitesi (HV = 0,33 · nh · Vh)",0.33,Wh/m³K,"TS 825 – Altun, Akçamete, Akgül (2020), Pamukkale Üniv. Müh. Bilim. Derg. 26(6), Denk. 5"
+F1,"Tavan/çatı ısı kaybı düzeltme katsayısı (0,8 · AT · UT)",0.8,oran,"TS 825 – Altun, Akçamete, Akgül (2020), Pamukkale Üniv. Müh. Bilim. Derg. 26(6), Denk. 4b"
+F2,"Zemine oturan döşeme düzeltme katsayısı (0,5 · At · Ut)",0.5,oran,"TS 825 – Altun, Akçamete, Akgül (2020), Pamukkale Üniv. Müh. Bilim. Derg. 26(6), Denk. 4b"
+H1,Kazan mevsimsel ısıtma verimi (asgari),0.86,oran,AB 813/2013 Ekotasarım Tüzüğü Ek II 1(a): ≤70 kW kazanlar için en az %86
+I1,"Nominal faiz oranı (TCMB politika faizi, bir hafta vadeli repo)",0.36,oran,"TCMB Para Politikası Kurulu kararı, 22 Ekim 2026 (QNB Yatırım araştırma notu)"
+I2,"Yıllık enflasyon (TÜFE, Ekim 2026)",0.2977,oran,"TÜİK, 3 Kasım 2026 (Anadolu Ajansı haberi)"
+KDV,Katma değer vergisi genel oranı,0.20,oran,"Cumhurbaşkanı Kararı 7346, Resmî Gazete 7 Temmuz 2023 (10 Temmuz 2023'ten itibaren %20)"
+EL1,"Elektrik konut fiyatı (EPDK, mesken AG tek zamanlı, düşük kademe: enerji 49,4065 + dağıtım 242,4900 kr/kWh)",2.918965,TL/kWh,"EPDK Kurul Kararı 14461, Resmî Gazete 33214, 4 Nisan 2026 (vergiler hariç; verinokta.com tarife tablosu, 11 Ekim 2026 teyit)"
+EL2,"Elektrik konut fiyatı (EPDK, mesken AG tek zamanlı, yüksek kademe: enerji 189,5808 + dağıtım 242,4900 kr/kWh)",4.320708,TL/kWh,"EPDK Kurul Kararı 14461, Resmî Gazete 33214, 4 Nisan 2026 (vergiler hariç; verinokta.com tarife tablosu, 11 Ekim 2026 teyit)"
+EL3,Elektrik tüketim emisyon faktörü (dağıtım şebekesine bağlı tüketici),0.478,tCO₂e/MWh,"ETKB Enerji Verimliliği ve Çevre Dairesi, Türkiye Ulusal Elektrik Şebekesi Emisyon Faktörü Bilgi Formu (2022 verisi)"
+S1,"Klima mevsimsel soğutma verimi SEER (asgari, < 6 kW, GWP > 150)",4.6,oran,AB 206/2012 Ekotasarım Tüzüğü Ek I Çizelge 6 (1 Ocak 2014'ten itibaren)
+S2,"Isı pompalı klima mevsimsel ısıtma verimi SCOP (asgari, ortalama iklim)",3.8,oran,AB 206/2012 Ekotasarım Tüzüğü Ek I Çizelge 6 (1 Ocak 2014'ten itibaren)
+B1,"Dış cephesi en az zor yanıcı (A2-s1,d0) olması gereken bina yüksekliği sınırı",28.5,m,Binaların Yangından Korunması Hakkında Yönetmelik Md. 27(1); Dalmaçyalı Stonewool Barrier broşürü
+B2,Zor alevlenici cephe sisteminde zemin kotundan itibaren hiç yanmaz malzeme şeridi,1.5,m,Binaların Yangından Korunması Hakkında Yönetmelik Md. 27(2)(b)
+B3,Pencere çevresinde hiç yanmaz yangın bariyeri gereken bina yüksekliği sınırı,6.5,m,Binaların Yangından Korunması Hakkında Yönetmelik Md. 27(2)(b)
