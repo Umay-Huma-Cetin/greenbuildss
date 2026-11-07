@@ -131,10 +131,10 @@ CREATE TABLE IF NOT EXISTS teklifler (
 
             foreach (var il in v.Iller)
                 Calistir(c, "INSERT INTO iller VALUES (@il,@h,@s)", t, ("@il", il.Ad), ("@h", il.IsitmaDG), ("@s", il.SogutmaDG));
-            foreach (var il in v.Iller.Where(i => i.Ts825Bolge.HasValue))
-                Calistir(c, "INSERT INTO il_bolgeleri VALUES (@il,@b,@k)", t, ("@il", il.Ad), ("@b", il.Ts825Bolge!.Value), ("@k", il.BolgeKaynagi));
             foreach (var b in v.Bolgeler)
                 Calistir(c, "INSERT INTO ts825_bolgeler VALUES (@n,@d,@c,@z,@p)", t, ("@n", b.No), ("@d", b.UDuvar), ("@c", b.UCati), ("@z", b.UZemin), ("@p", b.UPencere));
+            foreach (var il in v.Iller.Where(i => i.Ts825Bolge.HasValue))
+                Calistir(c, "INSERT INTO il_bolgeleri VALUES (@il,@b,@k)", t, ("@il", il.Ad), ("@b", il.Ts825Bolge!.Value), ("@k", il.BolgeKaynagi));
             foreach (var p in v.PencereDegerleri)
                 Calistir(c, "INSERT INTO ts825_pencere VALUES (@d,@c,@a,@u,@k)", t, ("@d", p.Dograma), ("@c", p.CamTipi), ("@a", p.AraBoslukMm), ("@u", p.U), ("@k", p.Kaynak));
             foreach (var y in v.Yakitlar)
