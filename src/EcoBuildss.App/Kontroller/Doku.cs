@@ -10,10 +10,10 @@ namespace EcoBuildss.UI
         /// <summary>Doku anahtarı: Y1 = EPS, Y2 = XPS, Y3 = taş yünü, Y4 = cam yünü (malzemeler.csv kimliklerinden).</summary>
         static string DokuId(string id) => id switch
         {
-            "Y1" or "Y2" or "Y3" => "Y1",   // EPS mantolama 5 / 8 / 10 cm
-            "Y4" or "Y5" or "Y6" => "Y3",   // taş yünü mantolama 5 / 8 / 10 cm
-            "C1" => "Y4",                   // cam yünü çatı şiltesi
-            "Z1" => "Y2",                   // XPS zemin levhası
+            "Y1" or "Y2" or "Y3" or "Y7" or "Y8" => "Y1",    // EPS mantolama 5 / 8 / 10 / 12 / 15 cm
+            "Y4" or "Y5" or "Y6" or "Y9" or "Y10" => "Y3",   // taş yünü mantolama 5 / 8 / 10 / 12 / 15 cm
+            "C1" or "C2" => "Y4",                            // cam yünü çatı şiltesi
+            "Z1" or "Z2" => "Y2",                            // XPS zemin levhası
             _ => id
         };
 

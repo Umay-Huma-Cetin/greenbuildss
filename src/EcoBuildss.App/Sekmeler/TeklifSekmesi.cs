@@ -41,6 +41,11 @@ namespace EcoBuildss.UI
         // ---- sonuçlar ----
         readonly List<PaketKarti> paketKartlari = new();
         readonly BinaPanel bina = new() { Dock = DockStyle.Fill };
+        // Malzemeleri özelleştir: mantolama, cam ve duvar kartları (mühendis paketi tek tek değiştirebilir)
+        readonly TabControl kartAlani = new() { Dock = DockStyle.Bottom, Height = 172, Visible = false, Font = Ui.Yazi };
+        readonly Button btnOzellestir = new() { Text = "Malzemeleri özelleştir  ▾", AutoSize = true, FlatStyle = FlatStyle.Flat, ForeColor = Ui.Yesil, BackColor = Color.White, Cursor = Cursors.Hand, Font = Ui.Kalin };
+        readonly List<MalzemeKarti> malzemeKartlari = new();
+        TabPage? duvarSayfasi;
         readonly Label ozTutar = new() { AutoSize = true, Font = new Font("Segoe UI Semibold", 20f), ForeColor = Ui.Koyu },
             ozAlt = new() { AutoSize = true, Font = Ui.Yazi, ForeColor = Ui.Soluk }, ozSatir = new() { AutoSize = true, Font = new Font("Segoe UI", 10.5f), ForeColor = Ui.Metin },
             ozKabul = new() { AutoSize = true, Font = new Font("Segoe UI Semibold", 11f) }, ozNot = new() { AutoSize = true, Font = Ui.Kucuk, ForeColor = Ui.Soluk };
@@ -109,7 +114,26 @@ namespace EcoBuildss.UI
                 paketKartlari.Add(k); kartlar.Controls.Add(k, i, 0);
             }
             var binaKart = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6) };
-            binaKart.Controls.Add(bina);
+            var ozellestirSatiri = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 38, Padding = new Padding(0, 4, 0, 0) };
+            btnOzellestir.FlatAppearance.BorderColor = Ui.Kenar;
+            btnOzellestir.Click += (_, __) => { kartAlani.Visible = !kartAlani.Visible; btnOzellestir.Text = kartAlani.Visible ? "Malzeme seçimini kapat  ▴" : "Malzemeleri özelleştir  ▾"; };
+            ozellestirSatiri.Controls.Add(btnOzellestir);
+            foreach (var (ad, tur) in new[] { ("Dış cephe yalıtımı", 'Y'), ("Pencere camı", 'P'), ("Duvar malzemesi", 'D') })
+            {
+                var sira = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, AutoScroll = true, BackColor = Color.White };
+                // Kartlar aileye ve kalınlığa göre sıralı (EPS 5, 8, 10 … Taş yünü 5, 8, 10 …)
+                foreach (var m in d.V.Malzemeler.Where(m => m.Tur == tur).OrderBy(m => m.Aile).ThenBy(m => m.Kalinlik))
+                {
+                    var kart = new MalzemeKarti(m);
+                    kart.Secildi += (_, __) => MalzemeSec(m);
+                    new ToolTip().SetToolTip(kart, $"{m.Ad}\n{m.FiyatHesabi}\nFiyat kaynağı: {m.FiyatKaynagi} ({m.FiyatTarihi})");
+                    malzemeKartlari.Add(kart); sira.Controls.Add(kart);
+                }
+                var tp = new TabPage(ad) { BackColor = Color.White, Padding = new Padding(8, 8, 8, 0) };
+                tp.Controls.Add(sira); kartAlani.TabPages.Add(tp);
+                if (tur == 'D') duvarSayfasi = tp;
+            }
+            binaKart.Controls.Add(bina); binaKart.Controls.Add(ozellestirSatiri); binaKart.Controls.Add(kartAlani);
 
             var ozet = new Panel { Dock = DockStyle.Bottom, Height = 112, BackColor = Color.White, Padding = new Padding(18, 10, 14, 8) };
             ozet.Paint += (_, e) => { using var p = new Pen(Ui.Kenar); e.Graphics.DrawLine(p, 0, 0, ozet.Width, 0); };
@@ -216,6 +240,21 @@ namespace EcoBuildss.UI
             if (p == null || SonSonuc == null) return;
             secili = p;
             foreach (var k in paketKartlari) { k.Secili = k.Paket?.S.Kod == p.S.Kod; k.Invalidate(); }
+            var oneri = SonSonuc.Siralama[0];
+            foreach (var mk in malzemeKartlari)
+            {
+                string id = mk.Malzeme.Id;
+                mk.Secili = id == p.S.Yalitim.Id || id == p.S.Cam.Id || (!SonSonuc.Mevcut && id == p.S.Duvar.Id);
+                mk.Onerilen = id == oneri.Yalitim.Id || id == oneri.Cam.Id || (!SonSonuc.Mevcut && id == oneri.Duvar.Id);
+                // Yangın yönetmeliği nedeniyle bu binada kullanılamayan yalıtım soluk görünür
+                mk.Enabled = mk.Malzeme.Tur != 'Y' || SonSonuc.Tum.Any(x => x.Yalitim.Id == id);
+            }
+            if (duvarSayfasi != null)
+            {
+                bool gerek = !SonSonuc.Mevcut;
+                if (gerek && !kartAlani.TabPages.Contains(duvarSayfasi)) kartAlani.TabPages.Add(duvarSayfasi);
+                else if (!gerek && kartAlani.TabPages.Contains(duvarSayfasi)) kartAlani.TabPages.Remove(duvarSayfasi);
+            }
             var r = SonSonuc; var s = p.S;
             // Bina çizimi ve ölçekli duvar kesiti
             bina.Form = SonGirdi!.Bina; bina.CamOrani = SonGirdi.CamOrani; bina.KatYuksekligi = (double)katH.Value;
@@ -233,6 +272,18 @@ namespace EcoBuildss.UI
             ozKabul.ForeColor = (p.KabulOlasiligi ?? 1) >= 0.5 ? Ui.Yesil : Ui.Kirmizi;
             ozNot.Text = (r.Kalibrasyon != 1 ? $"Enerji, firmanın gerçek tüketim kayıtlarıyla düzeltildi (×{Ui.Sayi(r.Kalibrasyon, "0.00")}). " : "")
                        + (s.YanginEkMaliyet > 0 ? "Yangın yönetmeliği gereği zemin şeridi taş yünü (bedeli dahil)." : "");
+        }
+
+        /// <summary>Mühendis bir malzeme kartına tıklayınca seçili paketin yalnız o bileşeni değişir; teklif anında yeniden hesaplanır.</summary>
+        void MalzemeSec(Malzeme m)
+        {
+            if (secili == null || SonSonuc == null) return;
+            var s = secili.S;
+            string y = m.Tur == 'Y' ? m.Id : s.Yalitim.Id, c = m.Tur == 'P' ? m.Id : s.Cam.Id, du = m.Tur == 'D' ? m.Id : s.Duvar.Id;
+            var yeni = SonSonuc.Tum.FirstOrDefault(x => x.Yalitim.Id == y && x.Cam.Id == c && x.Duvar.Id == du);
+            if (yeni == null) { d.Bildir($"{m.KisaAd} bu binada kullanılamıyor (yangın yönetmeliği ya da doğrama için TS 825 değeri yok)."); return; }
+            Sec(paketler.FirstOrDefault(p => p.S.Kod == yeni.Kod) ?? PaketHesapla("Özel", yeni));
+            if (!yeni.Ts825Uygun) d.Bildir($"Dikkat: {TeklifRaporu.PaketAdi(yeni)} TS 825 U sınırını sağlamıyor.");
         }
 
         // ---------------- ayrıntılar penceresi ----------------
