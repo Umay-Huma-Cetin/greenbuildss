@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>EcoBuildss</AssemblyName>
+    <RootNamespace>EcoBuildss.UI</RootNamespace>
+    <Product>EcoBuildss</Product>
+    <Authors>Umay Hüma Çetin</Authors>
+    <Version>3.0.0</Version>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <!-- Linux'ta yalnız derleme denetimi için (çalıştırma Windows'ta) -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\EcoBuildss.Core\EcoBuildss.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Kaynak gösterimli referans veri ve örnek (sentetik) veri programın yanına kopyalanır -->
+    <None Include="..\..\veri\referans\*.csv" Link="veri\referans\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\veri\ornek\*.csv" Link="veri\ornek\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

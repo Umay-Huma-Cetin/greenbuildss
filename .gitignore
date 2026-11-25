@@ -11,3 +11,6 @@ obj/
 *.db
 *.db-journal
 *.yedek
+*.db
+*.db-wal
+*.db-shm
