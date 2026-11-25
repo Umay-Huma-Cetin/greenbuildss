@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>EcoBuildss.Core</RootNamespace>
+    <AssemblyName>EcoBuildss.Core</AssemblyName>
+    <Authors>Umay Hüma Çetin</Authors>
+    <Version>3.0.0</Version>
+    <!-- Dış paket yok: SQLite'a Windows'un kendi winsqlite3.dll'i ile (Linux'ta libsqlite3) bağlanılır -->
+    <DefineConstants Condition="'$(OS)' != 'Windows_NT'">$(DefineConstants);LINUX_SQLITE</DefineConstants>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+</Project>
