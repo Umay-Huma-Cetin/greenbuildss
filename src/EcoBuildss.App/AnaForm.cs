@@ -9,7 +9,7 @@ namespace EcoBuildss.UI
         readonly Label durumYazisi = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Font = Ui.Kucuk, ForeColor = Ui.Soluk, Padding = new Padding(10, 0, 0, 0) };
         readonly Label ornekUyari = new()
         {
-            AutoSize = true, Text = "ÖRNEK (SENTETİK) VERİ KULLANILIYOR — gerçek veri için Veri sekmesinden kendi dosyanızı yükleyin",
+            AutoSize = true, Text = "Örnek (sentetik) veri kullanılıyor",
             Font = Ui.Kalin, BackColor = Ui.Amber, ForeColor = Ui.Koyu, Padding = new Padding(8, 4, 8, 4), Visible = false,
         };
         TeklifSekmesi? teklif;
