@@ -74,9 +74,9 @@ namespace EcoBuildss.UI
             // ================= sol: girdiler =================
             var sol = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, Padding = new Padding(18, 14, 8, 8), BackColor = Color.White };
             void Alan(FlowLayoutPanel p, string ad, Control c) { p.Controls.Add(Ui.Etiket(ad)); p.Controls.Add(c); }
-            sol.Controls.Add(new Label { Text = "Yeni teklif", AutoSize = true, Font = new Font("Segoe UI Semibold", 14f), ForeColor = Ui.Koyu, Margin = new Padding(0, 0, 0, 6) });
+            sol.Controls.Add(new Label { Text = "Yeni bina", AutoSize = true, Font = new Font("Segoe UI Semibold", 14f), ForeColor = Ui.Koyu, Margin = new Padding(0, 0, 0, 6) });
             Alan(sol, "İl", il); sol.Controls.Add(ilBilgi);
-            Alan(sol, "Proje", projeTuru);
+            projeTuru.SelectedItem = "Yeni bina";   // bu ekran yeni bina içindir; mevcut bina Apartman mantolaması ekranında
             var olcu = new TableLayoutPanel { ColumnCount = 3, RowCount = 2, AutoSize = true, Margin = new Padding(0, 6, 0, 0) };
             for (int i = 0; i < 3; i++) olcu.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 82));
             foreach (var c in new Control[] { en, boy, kat }) { c.Width = 74; c.Margin = new Padding(0, 0, 8, 0); }
@@ -135,7 +135,7 @@ namespace EcoBuildss.UI
             }
             binaKart.Controls.Add(bina); binaKart.Controls.Add(ozellestirSatiri); binaKart.Controls.Add(kartAlani);
 
-            var ozet = new Panel { Dock = DockStyle.Bottom, Height = 112, BackColor = Color.White, Padding = new Padding(18, 10, 14, 8) };
+            var ozet = new Panel { Dock = DockStyle.Bottom, Height = 140, BackColor = Color.White, Padding = new Padding(18, 10, 14, 8) };
             ozet.Paint += (_, e) => { using var p = new Pen(Ui.Kenar); e.Graphics.DrawLine(p, 0, 0, ozet.Width, 0); };
             var ozSol = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             var tutarSatiri = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
@@ -144,7 +144,8 @@ namespace EcoBuildss.UI
             var ozSag = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(0, 8, 0, 0) };
             var kaydet = Ui.Dugme("Teklifi kaydet", (_, __) => Kaydet(), true); kaydet.Width = 170; kaydet.AutoSize = false; kaydet.Height = 36;
             var ayrinti = Ui.Dugme("Ayrıntılar, Excel, yazdır…", (_, __) => Ayrintilar()); ayrinti.Width = 170; ayrinti.AutoSize = false; ayrinti.Height = 32;
-            ozSag.Controls.Add(kaydet); ozSag.Controls.Add(ayrinti);
+            var analiz = Ui.Dugme("Ayrıntılı analiz…", (_, __) => Analiz()); analiz.Width = 170; analiz.AutoSize = false; analiz.Height = 32;
+            ozSag.Controls.Add(kaydet); ozSag.Controls.Add(ayrinti); ozSag.Controls.Add(analiz);
             ozet.Controls.Add(ozSol); ozet.Controls.Add(ozSag);
 
             var orta = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8, 8, 8, 0) };
@@ -268,7 +269,7 @@ namespace EcoBuildss.UI
             string tasarruf = r.Mevcut ? $"Yıllık tasarruf {Ui.Tl(Math.Max(0, r.MevcutGiderTL - s.YillikGiderTL))}" : $"Yıllık enerji gideri {Ui.Tl(s.YillikGiderTL)}";
             string geri = p.GeriOdeme is double y ? (y < 0.05 ? "ek yatırım yok" : $"kendini {Ui.Sayi(y, "0.0")} yılda öder") : "enerji tasarrufu ek yatırımı karşılamıyor";
             ozSatir.Text = $"{TeklifRaporu.PaketAdi(s)}   ·   {tasarruf}   ·   {geri}   ·   {(s.Ts825Uygun ? "TS 825'e uygun ✓" : "TS 825'e uygun değil")}";
-            ozKabul.Text = p.KabulOlasiligi is double k2 ? $"Kabul olasılığı %{100 * k2:0}" : "";
+            ozKabul.Text = p.KabulOlasiligi is double k2 ? $"Kazanma olasılığı {Ui.Olasilik(k2)}" : "";
             ozKabul.ForeColor = (p.KabulOlasiligi ?? 1) >= 0.5 ? Ui.Yesil : Ui.Kirmizi;
             ozNot.Text = (r.Kalibrasyon != 1 ? $"Enerji, firmanın gerçek tüketim kayıtlarıyla düzeltildi (×{Ui.Sayi(r.Kalibrasyon, "0.00")}). " : "")
                        + (s.YanginEkMaliyet > 0 ? "Yangın yönetmeliği gereği zemin şeridi taş yünü (bedeli dahil)." : "");
@@ -284,6 +285,16 @@ namespace EcoBuildss.UI
             if (yeni == null) { d.Bildir($"{m.KisaAd} bu binada kullanılamıyor (yangın yönetmeliği ya da doğrama için TS 825 değeri yok)."); return; }
             Sec(paketler.FirstOrDefault(p => p.S.Kod == yeni.Kod) ?? PaketHesapla("Özel", yeni));
             if (!yeni.Ts825Uygun) d.Bildir($"Dikkat: {TeklifRaporu.PaketAdi(yeni)} TS 825 U sınırını sağlamıyor.");
+        }
+
+        /// <summary>Ekonomik kalınlık, bütçe, duyarlılık ve Monte Carlo: ayrı pencerede.</summary>
+        void Analiz()
+        {
+            if (SonSonuc == null) return;
+            using var f = new Form { Text = "Ayrıntılı analiz", Size = new Size(1320, 860), StartPosition = FormStartPosition.CenterParent, Font = Ui.Yazi, BackColor = Ui.Zemin };
+            var a = new AnalizSekmesi(d, () => SonGirdi, () => SonSonuc) { Dock = DockStyle.Fill };
+            f.Controls.Add(a);
+            f.ShowDialog(this);
         }
 
         // ---------------- ayrıntılar penceresi ----------------
@@ -357,7 +368,7 @@ namespace EcoBuildss.UI
                 TeklifTL = secili.TeklifTL, TeklifTLm2 = secili.TeklifTLm2, GeriOdemeYil = secili.GeriOdeme, IndirimOrani = (double)indirim.Value / 100, YanitSuresiGun = (double)yanit.Value,
                 RakipTeklif = rakip.Checked, KabulOlasiligi = secili.KabulOlasiligi,
             };
-            try { d.Db.TeklifKaydet(t); d.TekliflerDegistiDuyur(); d.Bildir($"{t.TeklifNo} kaydedildi. Sonucu belli olunca Kayıtlı teklifler sekmesinden Kabul/Red işaretleyin."); }
+            try { d.Db.TeklifKaydet(t); d.TekliflerDegistiDuyur(); d.Bildir($"{t.TeklifNo} kaydedildi. Sonucu belli olunca Tekliflerim ekranında Kabul/Red işaretleyin."); }
             catch (Exception e) { Ui.Hata(this, "Kaydedilemedi: " + e.Message); }
         }
 

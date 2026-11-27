@@ -15,6 +15,8 @@ namespace EcoBuildss.UI
         public static string Tl(double v) => v.ToString("N0", TR) + " TL";
         public static string Sayi(double v, string b = "N0") => v.ToString(b, TR);
         public static string Yuzde(double v, string b = "0.0") => "%" + (100 * v).ToString(b, TR);
+        /// <summary>Olasılık gösterimi: model hiçbir zaman kesin değildir, %1–%99 aralığında yazılır.</summary>
+        public static string Olasilik(double p) => "%" + Math.Max(1, Math.Min(99, Math.Round(100 * p))).ToString("0", TR);
 
         public static Label Etiket(string metin, Font? f = null, Color? renk = null) =>
             new() { Text = metin, AutoSize = true, Font = f ?? Yazi, ForeColor = renk ?? Metin, Margin = new Padding(0, 6, 0, 2) };

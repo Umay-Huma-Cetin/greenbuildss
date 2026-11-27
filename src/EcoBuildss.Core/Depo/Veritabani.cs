@@ -18,6 +18,7 @@ namespace EcoBuildss.Core.Depo
         public bool RakipTeklif;
         public string YalitimId = "", CamId = "", DuvarId = "", Dograma = "", Yakit = "DG";
         public double En, Boy, KatYuksekligi, CamOrani; public int KatSayisi; public bool Sogutma;
+        public int DaireSayisi;   // apartman mantolamasında daire başına paylaşım için
         public string Sonuc = "Bekliyor";   // Bekliyor / Kabul / Red
     }
 
@@ -46,7 +47,11 @@ CREATE TABLE IF NOT EXISTS teklifler (
   sonuc TEXT NOT NULL DEFAULT 'Bekliyor' CHECK (sonuc IN ('Bekliyor','Kabul','Red')));
 CREATE TABLE IF NOT EXISTS model_calismalari (
   id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TEXT NOT NULL, model TEXT NOT NULL, veri_kaynagi TEXT NOT NULL, kayit_sayisi INTEGER NOT NULL, ozet TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS islem_gunlugu (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TEXT NOT NULL, islem TEXT NOT NULL, ayrinti TEXT)");
+CREATE TABLE IF NOT EXISTS islem_gunlugu (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TEXT NOT NULL, islem TEXT NOT NULL, ayrinti TEXT);
+CREATE TABLE IF NOT EXISTS ayarlar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NULL)");
+            // Eski sürümden gelen veritabanına yeni sütun eklenir (varsa hata yok sayılır)
+            if (!b.Sorgu("PRAGMA table_info(teklifler)").Any(r => (string?)r["name"] == "daire_sayisi"))
+                b.Calistir("ALTER TABLE teklifler ADD COLUMN daire_sayisi INTEGER NOT NULL DEFAULT 0");
         }
 
         public void Gunluk(string islem, string ayrinti = "") =>
@@ -98,11 +103,11 @@ CREATE TABLE IF NOT EXISTS islem_gunlugu (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                 ["alan"] = t.KullanimAlani, ["paket"] = t.Paket, ["onc"] = t.Oncelik, ["y"] = t.YalitimId, ["c"] = t.CamId, ["d"] = t.DuvarId, ["dog"] = t.Dograma,
                 ["yak"] = t.Yakit, ["en"] = t.En, ["boy"] = t.Boy, ["kat"] = t.KatSayisi, ["kh"] = t.KatYuksekligi, ["co"] = t.CamOrani, ["sog"] = t.Sogutma,
                 ["tl"] = t.TeklifTL, ["tlm2"] = t.TeklifTLm2, ["go"] = t.GeriOdemeYil, ["ind"] = t.IndirimOrani, ["yan"] = t.YanitSuresiGun, ["rak"] = t.RakipTeklif,
-                ["ko"] = t.KabulOlasiligi, ["son"] = t.Sonuc,
+                ["ko"] = t.KabulOlasiligi, ["son"] = t.Sonuc, ["ds"] = t.DaireSayisi,
             };
             t.Id = b.Yaz(@"INSERT INTO teklifler (teklif_no, tarih, musteri, musteri_tipi, il, proje_turu, kullanim_alani, paket, oncelik, yalitim_id, cam_id, duvar_id, dograma, yakit,
-                en, boy, kat_sayisi, kat_yuksekligi, cam_orani, sogutma, teklif_tl, teklif_tl_m2, geri_odeme_yil, indirim_orani, yanit_suresi_gun, rakip_teklif, kabul_olasiligi, sonuc)
-                VALUES (@no, @tarih, @musteri, @mt, @il, @pt, @alan, @paket, @onc, @y, @c, @d, @dog, @yak, @en, @boy, @kat, @kh, @co, @sog, @tl, @tlm2, @go, @ind, @yan, @rak, @ko, @son)", p);
+                en, boy, kat_sayisi, kat_yuksekligi, cam_orani, sogutma, teklif_tl, teklif_tl_m2, geri_odeme_yil, indirim_orani, yanit_suresi_gun, rakip_teklif, kabul_olasiligi, sonuc, daire_sayisi)
+                VALUES (@no, @tarih, @musteri, @mt, @il, @pt, @alan, @paket, @onc, @y, @c, @d, @dog, @yak, @en, @boy, @kat, @kh, @co, @sog, @tl, @tlm2, @go, @ind, @yan, @rak, @ko, @son, @ds)", p);
             Gunluk("Teklif kaydedildi", $"{t.TeklifNo} · {t.Il} · {t.Paket} · {t.TeklifTL:N0} TL");
             return t.Id;
         }
@@ -124,7 +129,7 @@ CREATE TABLE IF NOT EXISTS islem_gunlugu (id INTEGER PRIMARY KEY AUTOINCREMENT, 
             En = D(r["en"]), Boy = D(r["boy"]), KatSayisi = (int)(r["kat_sayisi"] as long? ?? 1), KatYuksekligi = D(r["kat_yuksekligi"]), CamOrani = D(r["cam_orani"]), Sogutma = (r["sogutma"] as long?) == 1,
             TeklifTL = D(r["teklif_tl"]), TeklifTLm2 = D(r["teklif_tl_m2"]), GeriOdemeYil = r["geri_odeme_yil"] == null ? null : D(r["geri_odeme_yil"]),
             IndirimOrani = D(r["indirim_orani"]), YanitSuresiGun = D(r["yanit_suresi_gun"]), RakipTeklif = (r["rakip_teklif"] as long?) == 1,
-            KabulOlasiligi = r["kabul_olasiligi"] == null ? null : D(r["kabul_olasiligi"]), Sonuc = S(r["sonuc"]),
+            KabulOlasiligi = r["kabul_olasiligi"] == null ? null : D(r["kabul_olasiligi"]), Sonuc = S(r["sonuc"]), DaireSayisi = (int)(r["daire_sayisi"] as long? ?? 0),
         }).ToList();
 
         /// <summary>Sonucu belli olan (kabul/red) kayıtlı teklifler, teklif geçmişi şemasında satır olarak — modeli firmanın kendi sonuçlarıyla besler.</summary>
@@ -147,6 +152,15 @@ CREATE TABLE IF NOT EXISTS islem_gunlugu (id INTEGER PRIMARY KEY AUTOINCREMENT, 
             var r = b.Sorgu("SELECT COUNT(*) AS n FROM teklifler WHERE teklif_no LIKE @p", new Dictionary<string, object?> { ["p"] = on + "%" });
             return on + ((long)r[0]["n"]! + 1).ToString("0000");
         }
+
+        // ---------------- Ayarlar (firma bilgileri) ----------------
+        public string Ayar(string anahtar, string varsayilan = "")
+        {
+            var r = b.Sorgu("SELECT deger FROM ayarlar WHERE anahtar = @a", new Dictionary<string, object?> { ["a"] = anahtar });
+            return r.Count == 0 ? varsayilan : (string)r[0]["deger"]!;
+        }
+        public void AyarYaz(string anahtar, string deger) =>
+            b.Yaz("INSERT OR REPLACE INTO ayarlar (anahtar, deger) VALUES (@a, @d)", new Dictionary<string, object?> { ["a"] = anahtar, ["d"] = deger });
 
         // ---------------- Model çalışmaları ----------------
         public void ModelKaydet(string model, string kaynak, int n, string ozet) =>

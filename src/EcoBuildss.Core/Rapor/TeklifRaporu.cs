@@ -7,7 +7,7 @@ namespace EcoBuildss.Core
     /// <summary>Önerinin gerekçesi ve teklifin Excel dökümü (arayüzden bağımsız, test edilebilir).</summary>
     public static class TeklifRaporu
     {
-        public static string PaketAdi(Secenek s) => $"{s.Yalitim.KisaAd} · {s.Cam.KisaAd} · {s.DuvarAdi}";
+        public static string PaketAdi(Secenek s) => s.MevcutDuvar && !s.PencereDegisir ? $"{s.Yalitim.KisaAd} mantolama" : $"{s.Yalitim.KisaAd} · {s.Cam.KisaAd} · {s.DuvarAdi}";
 
         static string Tl(double v) => Math.Abs(v).ToString("N0", Ortak.TR) + " TL";
 
