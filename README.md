@@ -2,7 +2,7 @@
 
 Yalıtım ve inşaat firmaları için karar destek sistemi. Üç gerçek işi çözer:
 
-1. **Apartman mantolaması.** Bu işler kat malikleri toplantısında kazanılır ya da kaybedilir. Toplantıda herkes aynı üç şeyi sorar: daire başına ne ödeyeceğim, faturam ne kadar düşecek, kaç yılda döner. Sahada 10 dakikada bu üç sorunun cevabı ve toplantıda dağıtılacak tek sayfa çıkar. Bir dairenin gerçek doğal gaz faturası girilirse tasarruf o faturadan hesaplanır. Yapım yılı 2001 öncesiyse (4708 sayılı Yapı Denetimi Kanunu öncesi) mantolamadan önce riskli yapı tespiti (6306 sayılı Kanun) yaptırılması gerektiği ekranda ve toplantı sayfasında yazar.
+1. **Apartman mantolaması.** Bu işler kat malikleri toplantısında kazanılır ya da kaybedilir. Toplantıda herkes aynı üç şeyi sorar: daire başına ne ödeyeceğim, faturam ne kadar düşecek, kaç yılda döner. Sahada 10 dakikada bu üç sorunun cevabı ve toplantıda dağıtılacak tek sayfa çıkar. Bir dairenin gerçek doğal gaz faturası girilirse tasarruf o faturadan hesaplanır. Ödemede 60 aya kadar taksit, aylık vade farkı ve daire başına **destek** (hibe, belediye ya da kampanya desteği) girilebilir; daire başı tutar, taksit ve geri ödeme destek düşülerek hesaplanır. Destek tutarı güncel programa göre elle girilir, programın içinde sabit bir destek varsayılmaz. Yapım yılı 2001 öncesiyse (4708 sayılı Yapı Denetimi Kanunu öncesi) mantolamadan önce riskli yapı tespiti (6306 sayılı Kanun) yaptırılması gerektiği ekranda ve toplantı sayfasında yazar.
 2. **Yeni bina.** Ruhsattan önce TS 825 ve yangın yönetmeliğine uyan duvar–yalıtım–cam paketlerinden en uygun maliyetlisi; keşif, teklif ve Excel çıktısıyla.
 3. **Tekliflerim.** Verilen tekliflerin takibi: bekleyen işler, kazanma oranı, kazanılan iş. 14 günü geçip cevapsız kalan teklif "ara" diye işaretlenir; yönetici **Satışçılar** ile kişi bazında kazanma oranını görür. Sonuçlar işaretlendikçe sistem firmanın kendi verisinden kazanma olasılığını öğrenir.
 
@@ -139,7 +139,7 @@ dotnet run --project tests/EcoBuildss.Tests
 python araclar/dogrulama/bagimsiz_dogrulama.py <klasör>   # isteğe bağlı: pandas, scikit-learn
 ```
 
-119 test vardır ve şunları kapsar:
+121 test vardır ve şunları kapsar:
 - metrikler (F1, AUC, CV(RMSE))
 - regresyon ve gerçek levha fiyatları
 - enerji motoru ve yangın yönetmeliği kuralı

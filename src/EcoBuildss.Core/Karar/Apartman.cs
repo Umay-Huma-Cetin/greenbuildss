@@ -7,6 +7,8 @@ namespace EcoBuildss.Core
     {
         public int DaireSayisi;
         public double TeklifTL, KdvDahilTL, DaireBasiTL;        // tüm iş (KDV hariç / dahil) ve daire başına (KDV dahil, eşit pay)
+        public double Destek;                                    // daire başına hibe / destek (TL); geri ödenmez
+        public double NetDaireTL;                                // kat malikinin cebinden çıkan: daire başı − destek
         public int Taksit; public double AylikTaksit, ToplamOdeme; // daire başına
         public double AzalmaOrani;                               // ısıtma ihtiyacındaki azalma (1 − H_yeni / H_mevcut)
         public double FaturaOnce, FaturaSonra, YillikTasarruf;   // bir dairenin yıllık ısıtma faturası (TL)
@@ -25,8 +27,9 @@ namespace EcoBuildss.Core
         public const int IsitmaAyi = 6;   // Ekim–Mart
 
         public static ApartmanSonucu Hesapla(VeriDeposu v, Sonuc r, Secenek s, int daireSayisi, double firmaPayi, double indirim,
-                                             double? yillikFaturaDaire, double? yazAylikFaturaDaire, int taksit, double aylikVadeFarki)
+                                             double? yillikFaturaDaire, double? yazAylikFaturaDaire, int taksit, double aylikVadeFarki, double destekDaire = 0)
         {
+            if (destekDaire < 0) throw new ArgumentException("Destek tutarı negatif olamaz.");
             if (daireSayisi < 1) throw new ArgumentException("Daire sayısı en az 1 olmalı.");
             if (!r.Mevcut) throw new ArgumentException("Apartman hesabı yenileme (mevcut bina) içindir.");
             double kdv = v.P("KDV");
@@ -34,12 +37,14 @@ namespace EcoBuildss.Core
             a.TeklifTL = s.IlkYatirim * (1 + firmaPayi) * (1 - indirim);
             a.KdvDahilTL = a.TeklifTL * (1 + kdv);
             a.DaireBasiTL = a.KdvDahilTL / daireSayisi;
+            a.Destek = Math.Min(destekDaire, a.DaireBasiTL);
+            a.NetDaireTL = a.DaireBasiTL - a.Destek;
 
-            if (a.Taksit <= 1) { a.AylikTaksit = a.DaireBasiTL; a.ToplamOdeme = a.DaireBasiTL; }
+            if (a.Taksit <= 1) { a.AylikTaksit = a.NetDaireTL; a.ToplamOdeme = a.NetDaireTL; }
             else
             {
                 double i = Math.Max(0, aylikVadeFarki);
-                a.AylikTaksit = i < 1e-9 ? a.DaireBasiTL / a.Taksit : a.DaireBasiTL * i / (1 - Math.Pow(1 + i, -a.Taksit));
+                a.AylikTaksit = Taksit(a.NetDaireTL, a.Taksit, i);
                 a.ToplamOdeme = a.AylikTaksit * a.Taksit;
             }
 
@@ -59,7 +64,7 @@ namespace EcoBuildss.Core
             a.FaturaSonra = a.FaturaOnce * (1 - a.AzalmaOrani);
             a.YillikTasarruf = a.FaturaOnce - a.FaturaSonra;
             a.KisAylikTasarruf = a.YillikTasarruf / IsitmaAyi;
-            a.GeriOdemeYil = Kpi.IskontoluGeriOdeme(a.DaireBasiTL, a.YillikTasarruf, r.EnerjiIskonto);
+            a.GeriOdemeYil = Kpi.IskontoluGeriOdeme(a.NetDaireTL, a.YillikTasarruf, r.EnerjiIskonto);   // destek düşülmüş, kat malikinin kendi parası
             return a;
         }
 
