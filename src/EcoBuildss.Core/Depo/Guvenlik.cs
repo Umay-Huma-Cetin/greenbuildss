@@ -128,7 +128,40 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
                 string ozet = ZincirOzeti(onceki, id, tarih, kim, sev, islem, ayrinti);
                 b.Yaz("INSERT INTO islem_gunlugu (id, tarih, kullanici, seviye, islem, ayrinti, ozet) VALUES (@id, @t, @k, @s, @i, @a, @o)",
                       new Dictionary<string, object?> { ["id"] = id, ["t"] = tarih, ["k"] = kim, ["s"] = sev, ["i"] = islem, ["a"] = ayrinti, ["o"] = ozet });
+                if (dek != null) MuhurYaz(id, ozet);
             });
+        }
+
+        // ---- Günlük mühürü ----
+        // SHA-256 zinciri anahtarsızdır: dosyaya erişen biri zinciri baştan yeniden hesaplayabilir ya da son kayıtları silebilir.
+        // Bu yüzden oturum açıkken son kaydın özeti veri anahtarından türetilen anahtarla HMAC'lenir ("mühür").
+        // Veri anahtarını bilmeyen biri geçerli mühür üretemez; denetim mühürlü kaydın hâlâ yerinde ve aynı olduğunu doğrular.
+        const string MuhurAnahtari = "gunluk_muhur";
+
+        string MuhurHesapla(long id, string ozet)
+        {
+            using var t = new HMACSHA256(dek!.Skip(32).Take(32).ToArray());
+            var k = t.ComputeHash(Encoding.UTF8.GetBytes("gunluk-muhur-v1"));
+            using var h = new HMACSHA256(k);
+            return Convert.ToBase64String(h.ComputeHash(Encoding.UTF8.GetBytes(id.ToString(CultureInfo.InvariantCulture) + "\u001f" + ozet)));
+        }
+
+        static bool SabitZamanEsit(string a, string b)
+        {
+            if (a.Length != b.Length) return false;
+            int f = 0; for (int i = 0; i < a.Length; i++) f |= a[i] ^ b[i];
+            return f == 0;
+        }
+
+        void MuhurYaz(long id, string ozet) =>
+            b.Yaz("INSERT OR REPLACE INTO ayarlar (anahtar, deger) VALUES (@a, @d)", new Dictionary<string, object?>
+            { ["a"] = MuhurAnahtari, ["d"] = id.ToString(CultureInfo.InvariantCulture) + "|" + MuhurHesapla(id, ozet) });
+
+        /// <summary>Eski sürümden gelen ya da mühürü olmayan günlüğü oturum açılınca mühürler; bu durum günlüğe yazılır.</summary>
+        void MuhurYoksaOlustur()
+        {
+            if (dek == null || b.Sorgu("SELECT 1 FROM ayarlar WHERE anahtar = @a", new Dictionary<string, object?> { ["a"] = MuhurAnahtari }).Count > 0) return;
+            Gunluk("Günlük mühürü oluşturuldu", "önceki mühür bulunamadı", Seviye.Guvenlik);
         }
 
         static string SeviyeAdi(Seviye s) => s switch { Seviye.Uyari => "Uyarı", Seviye.Hata => "Hata", Seviye.Guvenlik => "Güvenlik", _ => "Bilgi" };
@@ -153,7 +186,35 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
                 if (ozet != S(r["ozet"])) return (n, $"#{id} numaralı kayıt sonradan değiştirilmiş.");
                 onceki = ozet; beklenenId = id + 1;
             }
+            var ihlal = b.Sorgu("SELECT deger FROM ayarlar WHERE anahtar = 'gunluk_ihlal'");
+            if (ihlal.Count > 0) return (n, S(ihlal[0]["deger"]));
+            if (dek != null && MuhurSorunu() is string ms) return (n, ms);
             return (n, null);
+        }
+
+        /// <summary>Mühürlü son kaydın yerinde ve değişmemiş olduğunu denetler (veri anahtarı açıkken).</summary>
+        string? MuhurSorunu()
+        {
+            var m = b.Sorgu("SELECT deger FROM ayarlar WHERE anahtar = @a", new Dictionary<string, object?> { ["a"] = MuhurAnahtari });
+            if (m.Count == 0) return null;   // henüz mühür yok (eski sürüm); girişte oluşturulur
+            var p = S(m[0]["deger"]).Split('|');
+            if (p.Length != 2 || !long.TryParse(p[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out long mid)) return "Günlük mühürü bozuk.";
+            var satir = b.Sorgu("SELECT ozet FROM islem_gunlugu WHERE id = @id", new Dictionary<string, object?> { ["id"] = mid });
+            if (satir.Count == 0) return $"#{mid} ve sonrasındaki günlük kayıtları silinmiş.";
+            if (!SabitZamanEsit(MuhurHesapla(mid, S(satir[0]["ozet"])), p[1])) return "Günlük sonradan baştan yazılmış (mühür tutmuyor).";
+            return null;
+        }
+
+        /// <summary>
+        /// Girişte, yeni kayıt mühürü ilerletmeden önce eski mühür denetlenir. Bozuksa bu kalıcı olarak işaretlenir:
+        /// sonraki kayıtlar mühürü ilerletse de ihlal Denetle'de görünmeye devam eder.
+        /// </summary>
+        void MuhurGirisDenetimi()
+        {
+            if (MuhurSorunu() is not string sorun) return;
+            string kayit = $"{sorun} (tespit: {DateTime.Now:dd.MM.yyyy HH:mm}, {Aktif?.KullaniciAdi} girişinde)";
+            b.Yaz("INSERT OR REPLACE INTO ayarlar (anahtar, deger) VALUES ('gunluk_ihlal', @d)", new Dictionary<string, object?> { ["d"] = kayit });
+            Gunluk("Günlük bütünlüğü bozuk", kayit, Seviye.Guvenlik);
         }
 
         public List<GunlukKaydi> GunlukOku(int n = 500, Seviye? seviye = null)
@@ -246,8 +307,10 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
             dek = anahtar;
             b.Yaz("UPDATE kullanicilar SET hatali_deneme = 0, kilit_bitis = NULL, son_giris = @t WHERE id = @id", new Dictionary<string, object?> { ["t"] = DateTime.Now, ["id"] = id });
             Aktif = kullanici;
+            MuhurGirisDenetimi();
             Gunluk("Oturum açıldı", $"{Aktif.KullaniciAdi} · {Aktif.RolAdi}", Seviye.Guvenlik);
             TeklifSifrelemesiniTamamla();
+            MuhurYoksaOlustur();
             return GirisSonucu.Basarili;
         }
 

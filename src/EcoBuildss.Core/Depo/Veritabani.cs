@@ -161,6 +161,11 @@ CREATE TABLE IF NOT EXISTS ayarlar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NUL
         {
             if (sonuc != "Bekliyor" && sonuc != "Kabul" && sonuc != "Red") throw new ArgumentException("Sonuç Bekliyor, Kabul ya da Red olmalı.");
             Yetki(yonetici: false, "Teklif sonucu işaretleme");
+            if (!Aktif!.Yonetici && !Teklifler().Any(t => t.Id == id))
+            {
+                Gunluk("Yetkisiz istek", $"başkasının teklifini işaretleme (#{id})", Seviye.Guvenlik);
+                throw new UnauthorizedAccessException("Yalnız kendi teklifinizin sonucunu işaretleyebilirsiniz.");
+            }
             string no = TeklifNo(id);
             b.Yaz("UPDATE teklifler SET sonuc = @s WHERE id = @id", new Dictionary<string, object?> { ["s"] = sonuc, ["id"] = id });
             Gunluk("Teklif sonucu", $"{no} → {sonuc}");
@@ -176,7 +181,24 @@ CREATE TABLE IF NOT EXISTS ayarlar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NUL
 
         string TeklifNo(long id) => b.Sorgu("SELECT teklif_no FROM teklifler WHERE id = @id", new Dictionary<string, object?> { ["id"] = id }).Select(r => S(r["teklif_no"])).FirstOrDefault() ?? $"#{id}";
 
-        public List<KayitliTeklif> Teklifler() => TekliflerHam("");
+        /// <summary>
+        /// Kayıtlı teklifler. Yönetici hepsini görür; Satış rolü yalnız kendi hazırladıklarını görür (en az yetki ilkesi).
+        /// </summary>
+        public List<KayitliTeklif> Teklifler()
+        {
+            Yetki(yonetici: false, "Teklifleri görüntüleme");
+            var l = TekliflerHam("");
+            return Aktif!.Yonetici ? l : l.Where(t => t.Hazirlayan == Aktif.KullaniciAdi).ToList();
+        }
+
+        /// <summary>Teklifin açıldığını günlüğe yazar (kim hangi teklifi görüntüledi). Satış rolü başkasının teklifini açamaz.</summary>
+        public KayitliTeklif TeklifAc(long id)
+        {
+            var t = Teklifler().FirstOrDefault(x => x.Id == id);
+            if (t == null) { Gunluk("Yetkisiz istek", $"teklif #{id} açma", Seviye.Guvenlik); throw new UnauthorizedAccessException("Bu teklife erişim yetkiniz yok."); }
+            Gunluk("Teklif açıldı", t.TeklifNo);
+            return t;
+        }
 
         List<KayitliTeklif> TekliflerHam(string kosul) => b.Sorgu("SELECT * FROM teklifler " + kosul + " ORDER BY tarih DESC, id DESC").Select(r => GizliAc(S(r["gizli"]), new KayitliTeklif
         {
@@ -205,7 +227,7 @@ CREATE TABLE IF NOT EXISTS ayarlar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NUL
         public string SonuclananTekliflerCsv(Sema teklifSemasi)
         {
             var sb = new StringBuilder(string.Join(",", teklifSemasi.Alanlar.Select(a => a.Ad)) + "\n");
-            foreach (var t in Teklifler().Where(t => t.Sonuc != "Bekliyor"))
+            foreach (var t in TekliflerHam("").Where(t => t.Sonuc != "Bekliyor"))   // model firmanın bütün sonuçlarıyla kurulur (yalnız istatistik; kişiye satır gösterilmez)
                 sb.AppendLine(string.Join(",", new[]
                 {
                     Csv.Kacis(t.TeklifNo), t.Tarih.ToString("yyyy-MM-dd"), Csv.Kacis(t.Il), t.MusteriTipi, t.ProjeTuru, Csv.Sayi(t.KullanimAlani), t.Paket, t.Oncelik,
