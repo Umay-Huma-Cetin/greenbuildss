@@ -73,7 +73,9 @@ namespace EcoBuildss.UI
         static Form Pencere(string baslik, int y) => new() { Text = baslik, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, StartPosition = FormStartPosition.CenterParent, ClientSize = new Size(380, y), BackColor = Color.White, Font = Ui.Yazi };
 
         /// <summary>Kurtarma anahtarı yalnız bir kez gösterilir; parola unutulursa şifreli veriye erişimin tek yoludur.</summary>
-        void KurtarmaAnahtariniGoster()
+        void KurtarmaAnahtariniGoster() => KurtarmaAnahtariniGoster(this, db);
+
+        internal static void KurtarmaAnahtariniGoster(IWin32Window sahip, Veritabani db)
         {
             if (db.YeniKurtarmaAnahtari is not string anahtar) return;
             using var f = Pencere("Kurtarma anahtarı", 270);
@@ -89,7 +91,7 @@ namespace EcoBuildss.UI
             p.Controls.Add(onay); p.Controls.Add(t);
             f.Controls.Add(p);
             f.FormClosing += (_, e) => { if (!onay.Checked) e.Cancel = true; };   // anahtar kaydedilmeden kapanmaz
-            f.ShowDialog(this);
+            f.ShowDialog(sahip);
             db.KurtarmaAnahtariGosterildi();
             db.Gunluk("Kurtarma anahtarı gösterildi", db.Aktif?.KullaniciAdi ?? "", Seviye.Guvenlik);
         }

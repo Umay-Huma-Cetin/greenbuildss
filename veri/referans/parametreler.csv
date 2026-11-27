@@ -26,3 +26,7 @@ S2,"Isı pompalı klima mevsimsel ısıtma verimi SCOP (asgari, ortalama iklim)"
 B1,"Dış cephesi en az zor yanıcı (A2-s1,d0) olması gereken bina yüksekliği sınırı",28.5,m,Binaların Yangından Korunması Hakkında Yönetmelik Md. 27(1); Dalmaçyalı Stonewool Barrier broşürü
 B2,Zor alevlenici cephe sisteminde zemin kotundan itibaren hiç yanmaz malzeme şeridi,1.5,m,Binaların Yangından Korunması Hakkında Yönetmelik Md. 27(2)(b)
 B3,Pencere çevresinde hiç yanmaz yangın bariyeri gereken bina yüksekliği sınırı,6.5,m,Binaların Yangından Korunması Hakkında Yönetmelik Md. 27(2)(b)
+B4,Pencere çevresi yangın bariyeri genişliği (yan kenarlar),0.15,m,Binaların Yangından Korunması Hakkında Yönetmelik Md. 27(2)(b): yan kenarlar en az 15 cm
+B5,Pencere çevresi yangın bariyeri genişliği (üst kenar),0.30,m,Binaların Yangından Korunması Hakkında Yönetmelik Md. 27(2)(b): üst kenar en az 30 cm
+B6,Bariyer hesabında tipik pencere genişliği,1.20,m,"Varsayım: pencere ölçüsü girilmediğinde tipik konut penceresi (120 × 150 cm); pencere sayısı = pencere alanı ÷ tek pencere alanı"
+B7,Bariyer hesabında tipik pencere yüksekliği,1.50,m,"Varsayım: pencere ölçüsü girilmediğinde tipik konut penceresi (120 × 150 cm)"

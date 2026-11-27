@@ -19,6 +19,7 @@ namespace EcoBuildss.UI
             katH = Sayi(2.4m, 6, 2.9m, 2), camOrani = Sayi(0, 90, 18, 0), mevcutU = Sayi(0.3m, 3.5m, 1.78m, 2), kar = Sayi(0, 100, 18, 0), indirim = Sayi(0, 60, 0, 1);
         readonly CheckBox cati = new() { Text = "Çatı arası", Checked = true, AutoSize = true },
             pencere = new() { Text = "Pencereler", AutoSize = true }, zemin = new() { Text = "Bodrum tavanı", AutoSize = true };
+        readonly NumericUpDown cevre = Sayi(0, 2000, 0, 1), taban = Sayi(0, 50000, 0, 0);
         readonly Panel digerPanel = new() { AutoSize = true, Visible = false };
         readonly Label ilBilgi = Ui.Aciklama("", 240);
 
@@ -66,9 +67,9 @@ namespace EcoBuildss.UI
             sol.Controls.Add(ac);
             var dp = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true, Margin = new Padding(0) };
             Alan(dp, "Mevcut duvar U (W/m²K)", mevcutU);
-            Alan(dp, "Kat yüksekliği (m)", katH); Alan(dp, "Pencere / dış duvar oranı (%)", camOrani); Alan(dp, "Pencere doğraması", dograma);
+            Alan(dp, "Kat yüksekliği (m)", katH); Alan(dp, "Plan çevresi (m)", cevre); Alan(dp, "Taban alanı (m²)", taban); Alan(dp, "Pencere / dış duvar oranı (%)", camOrani); Alan(dp, "Pencere doğraması", dograma);
             Alan(dp, "Firma payı: işçilik + kâr (%)", kar); Alan(dp, "İndirim (%)", indirim);
-            foreach (var c in new Control[] { mevcutU, katH, camOrani, kar, indirim }) c.Width = 120;
+            foreach (var c in new Control[] { cevre, taban, mevcutU, katH, camOrani, kar, indirim }) c.Width = 120;
             digerPanel.Controls.Add(dp); sol.Controls.Add(digerPanel);
 
             // ================= orta =================
@@ -104,7 +105,7 @@ namespace EcoBuildss.UI
             duzen.Controls.Add(sol, 0, 0); duzen.Controls.Add(orta, 1, 0);
             Controls.Add(duzen);
 
-            foreach (Control c in new Control[] { il, taksit, dograma, daire, kat, en, boy, fatura, yaz, vade, katH, camOrani, mevcutU, kar, indirim, cati, pencere, zemin })
+            foreach (Control c in new Control[] { cevre, taban, il, taksit, dograma, daire, kat, en, boy, fatura, yaz, vade, katH, camOrani, mevcutU, kar, indirim, cati, pencere, zemin })
                 switch (c)
                 {
                     case ComboBox cb: cb.SelectedIndexChanged += (_, __) => Degisti(); break;
@@ -112,6 +113,7 @@ namespace EcoBuildss.UI
                     case CheckBox ch: ch.CheckedChanged += (_, __) => Degisti(); break;
                 }
             VisibleChanged += (_, __) => { if (Visible && SonSonuc == null) Hesapla(); };
+            d.VeriDegisti += () => { if (SonSonuc != null) Hesapla(); };
         }
 
         static NumericUpDown Sayi(decimal min, decimal max, decimal deger, int ondalik, decimal? artis = null) =>
@@ -134,6 +136,11 @@ namespace EcoBuildss.UI
         Il SeciliIl => (Il)il.SelectedItem!;
         int TaksitSayisi => taksit.SelectedIndex switch { 1 => 6, 2 => 10, 3 => 12, 4 => 18, 5 => 24, _ => 0 };
 
+        /// <summary>Plan çevresi ve taban alanı girildiyse dikdörtgen olmayan plan, yoksa en × boy.</summary>
+        Bina BinaKur() => cevre.Value > 0 && taban.Value > 0
+            ? Bina.Plan((double)cevre.Value, (double)taban.Value, (int)kat.Value, (double)katH.Value)
+            : Bina.Dikdortgen((double)en.Value, (double)boy.Value, (int)kat.Value, (double)katH.Value);
+
         public void Hesapla()
         {
             try
@@ -141,7 +148,7 @@ namespace EcoBuildss.UI
                 ilBilgi.Text = $"{SeciliIl.Ts825Bolge}. iklim bölgesi · ısıtma {Ui.Sayi(SeciliIl.IsitmaDG)} °C·gün (MGM)";
                 var g = new Girdi
                 {
-                    Bina = Bina.Dikdortgen((double)en.Value, (double)boy.Value, (int)kat.Value, (double)katH.Value), Il = SeciliIl, Bolge = SeciliIl.Ts825Bolge ?? 4,
+                    Bina = BinaKur(), Il = SeciliIl, Bolge = SeciliIl.Ts825Bolge ?? 4,
                     CamOrani = (double)camOrani.Value / 100, Dograma = (string)dograma.SelectedItem!, Mevcut = true, MevcutDuvarU = (double)mevcutU.Value,
                     PencereDegisir = pencere.Checked, CatiYalitimi = cati.Checked, ZeminYalitimi = zemin.Checked, SadeceTs825 = true,
                     Kalibrasyon = d.Kalibrasyon?.Kullanilabilir == true ? d.Kalibrasyon.IsitmaKatsayisi : 1,
@@ -190,7 +197,7 @@ namespace EcoBuildss.UI
                 TeklifNo = d.Db.YeniTeklifNo(), Musteri = ad.Text.Trim(), MusteriTipi = "Site yönetimi", Il = SeciliIl.Ad, ProjeTuru = "Yenileme",
                 KullanimAlani = SonSonuc.KullanimAlani, Paket = pad == "En yüksek tasarruf" ? "Yüksek performans" : pad, Oncelik = "Dengeli",
                 YalitimId = s.Yalitim.Id, CamId = s.Cam.Id, DuvarId = s.Duvar.Id, Dograma = SonGirdi.Dograma, Yakit = "DG",
-                En = b.En ?? 0, Boy = b.Boy ?? 0, KatSayisi = b.KatSayisi, KatYuksekligi = (double)katH.Value, CamOrani = SonGirdi.CamOrani,
+                En = (double)en.Value, Boy = (double)boy.Value, Cevre = b.En.HasValue ? 0 : (double)cevre.Value, Taban = b.En.HasValue ? 0 : (double)taban.Value, KatSayisi = b.KatSayisi, KatYuksekligi = (double)katH.Value, CamOrani = SonGirdi.CamOrani,
                 TeklifTL = a.TeklifTL, TeklifTLm2 = a.TeklifTL / SonSonuc.KullanimAlani, GeriOdemeYil = a.GeriOdemeYil, IndirimOrani = (double)indirim.Value / 100,
                 DaireSayisi = a.DaireSayisi,
             };
@@ -208,6 +215,7 @@ namespace EcoBuildss.UI
             {
                 ad.Text = t.Musteri;
                 var i = il.Items.Cast<Il>().FirstOrDefault(x => x.Ad == t.Il); if (i != null) il.SelectedItem = i;
+                cevre.Value = Sinirla(cevre, t.Cevre); taban.Value = Sinirla(taban, t.Taban);
                 if (t.En > 0) { en.Value = Sinirla(en, t.En); boy.Value = Sinirla(boy, t.Boy); kat.Value = Sinirla(kat, t.KatSayisi); katH.Value = Sinirla(katH, t.KatYuksekligi); }
                 if (t.DaireSayisi > 0) daire.Value = Sinirla(daire, t.DaireSayisi);
                 camOrani.Value = Sinirla(camOrani, 100 * t.CamOrani); indirim.Value = Sinirla(indirim, 100 * t.IndirimOrani);

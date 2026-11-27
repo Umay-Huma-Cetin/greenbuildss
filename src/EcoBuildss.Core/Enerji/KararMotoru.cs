@@ -294,14 +294,25 @@ namespace EcoBuildss.Core
             if (a1 == null) return 0;
             double cevre = r.Bina.DisDuvarAlani / r.BinaYuksekligi;
             double serit = Math.Min(v.P("B2"), r.BinaYuksekligi) * cevre;
-            return serit * Math.Max(0, a1.FiyatM2 - y.FiyatM2);
+            return (serit + BariyerAlani(v, r)) * Math.Max(0, a1.FiyatM2 - y.FiyatM2);
+        }
+
+        /// <summary>
+        /// Bina B3 (6,5 m) üstündeyse pencere çevresi yangın bariyeri (Md. 27/2-b): yanlarda B4 (15 cm), üstte B5 (30 cm) eninde hiç yanmaz şerit.
+        /// Pencere sayısı, pencere alanının tipik pencere alanına (B6 × B7) bölünmesiyle bulunur. Üst şerit yan şeritlerin üstünü de örter.
+        /// </summary>
+        public static double BariyerAlani(VeriDeposu v, Sonuc r)
+        {
+            if (r.BinaYuksekligi <= v.P("B3") || r.CamAlani <= 0) return 0;
+            double w = v.P("B6"), h = v.P("B7"), n = r.CamAlani / (w * h);
+            return n * (2 * v.P("B4") * h + v.P("B5") * (w + 2 * v.P("B4")));
         }
 
         public static string YanginNotu(VeriDeposu v, Sonuc r, Malzeme y)
         {
             if (HicYanmaz(v, y)) return "";
             string n = $"Yangın md. 27: zeminden {v.P("B2").ToString("0.0#", Ortak.TR)} m A1 yalıtım (bedeli dahil)";
-            if (r.BinaYuksekligi > v.P("B3")) n += "; pencere çevresine A1 yangın bariyeri gerekir (bedele dahil değil)";
+            if (r.BinaYuksekligi > v.P("B3")) n += $"; pencere çevresi A1 bariyer ≈ {BariyerAlani(v, r).ToString("#,0", Ortak.TR)} m² (bedeli dahil)";
             return n + ".";
         }
 

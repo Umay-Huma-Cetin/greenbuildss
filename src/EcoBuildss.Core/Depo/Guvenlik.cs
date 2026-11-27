@@ -247,6 +247,7 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
             b.Yaz("UPDATE kullanicilar SET hatali_deneme = 0, kilit_bitis = NULL, son_giris = @t WHERE id = @id", new Dictionary<string, object?> { ["t"] = DateTime.Now, ["id"] = id });
             Aktif = kullanici;
             Gunluk("Oturum açıldı", $"{Aktif.KullaniciAdi} · {Aktif.RolAdi}", Seviye.Guvenlik);
+            TeklifSifrelemesiniTamamla();
             return GirisSonucu.Basarili;
         }
 
@@ -303,6 +304,23 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
         /// <summary>İlk kurulumda (ya da şifrelemesiz sürümden geçişte) üretilen kurtarma anahtarı: bir kez gösterilir, sonra silinir.</summary>
         public string? YeniKurtarmaAnahtari { get; private set; }
         public void KurtarmaAnahtariGosterildi() => YeniKurtarmaAnahtari = null;
+
+        /// <summary>
+        /// Yeni kurtarma anahtarı üretir (yönetici, kendi parolasıyla onaylar). Eski anahtar bu andan itibaren geçersizdir.
+        /// Anahtar kaybolduysa ya da başkasının eline geçtiyse kullanılır.
+        /// </summary>
+        public string KurtarmaAnahtariYenile(string parola)
+        {
+            Yetki(yonetici: true, "Kurtarma anahtarı yenileme");
+            var dogrulama = AnahtarAc(Aktif!.KullaniciAdi, parola);
+            if (dogrulama == null) { Gunluk("Kurtarma anahtarı yenilenemedi", "parola hatalı", Seviye.Guvenlik); throw new UnauthorizedAccessException("Parola hatalı."); }
+            Array.Clear(dogrulama, 0, dogrulama.Length);
+            string kurtarma = Sifreleme.KurtarmaAnahtari();
+            AnahtarSar("#kurtarma", Sifreleme.KurtarmaSade(kurtarma));
+            YeniKurtarmaAnahtari = kurtarma;
+            Gunluk("Kurtarma anahtarı yenilendi", "eski anahtar geçersiz", Seviye.Guvenlik);
+            return kurtarma;
+        }
         public bool Sifreli => dek != null;
         int AnahtarSayisi => (int)(long)b.Sorgu("SELECT COUNT(*) AS n FROM anahtarlar")[0]["n"]!;
 
@@ -369,10 +387,18 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
                 foreach (var r in b.Sorgu("SELECT veri_seti, anahtar, satir FROM veri_kayitlari"))
                     if (!Sifreleme.Sifreli(S(r["satir"])))
                         b.Yaz("UPDATE veri_kayitlari SET satir = @s WHERE veri_seti = @v AND anahtar = @a", new Dictionary<string, object?> { ["s"] = Sifrele(S(r["satir"])), ["v"] = r["veri_seti"], ["a"] = r["anahtar"] });
-                foreach (var r in b.Sorgu("SELECT id, musteri, teklif_tl, teklif_tl_m2, indirim_orani, kabul_olasiligi FROM teklifler WHERE gizli = ''"))
-                    b.Yaz("UPDATE teklifler SET gizli = @g, musteri = '', teklif_tl = 0, teklif_tl_m2 = 0, indirim_orani = 0, kabul_olasiligi = NULL WHERE id = @id", new Dictionary<string, object?>
-                    { ["g"] = Sifrele(GizliBirlestir(S(r["musteri"]), D(r["teklif_tl"]), D(r["teklif_tl_m2"]), D(r["indirim_orani"]), r["kabul_olasiligi"] == null ? null : D(r["kabul_olasiligi"]))), ["id"] = r["id"] });
             });
+            TeklifSifrelemesiniTamamla();
+        }
+
+        /// <summary>Eski sürümlerde düz ya da kısmen şifreli kalan teklif satırlarını tam şifreli biçime çevirir.</summary>
+        void TeklifSifrelemesiniTamamla()
+        {
+            if (dek == null) return;
+            var eski = TekliflerHam("WHERE il <> '' OR gizli = '' OR gizli NOT LIKE 'e1:%'");
+            if (eski.Count == 0) return;
+            b.Islem(() => { foreach (var t in eski) TeklifGizliYaz(t); });
+            Gunluk("Teklifler şifrelendi", $"{eski.Count} teklif tam şifreli biçime çevrildi", Seviye.Guvenlik);
         }
 
         static string GizliBirlestir(string musteri, double tl, double tlm2, double indirim, double? kabul) =>

@@ -34,9 +34,9 @@ Geliştiren: **Umay Hüma Çetin**
 - Sistemde en az bir etkin yönetici kalması zorunludur.
 
 **Şifreleme**
-- Müşteri adı, teklif tutarı, indirim, kabul olasılığı, içe aktarılan veri satırları ve günlük ayrıntıları veritabanında şifreli tutulur: AES-256-CBC + HMAC-SHA256 (önce şifrele, sonra doğrula), her değer için rastgele IV.
+- Teklifin numara, tarih ve sonuç dışındaki her alanı (müşteri, il, bina ölçüleri, paket, tutar, indirim, kabul olasılığı, hazırlayan), içe aktarılan veri satırları ve günlük ayrıntıları veritabanında şifreli tutulur: AES-256-CBC + HMAC-SHA256 (önce şifrele, sonra doğrula), her değer için rastgele IV.
 - Veri anahtarı rastgele üretilir ve hiçbir zaman düz saklanmaz. Her kullanıcının parolasından PBKDF2 ile türetilen anahtarla ayrı ayrı sarılır. Veritabanı dosyası kopyalansa bile parola olmadan bu alanlar okunamaz.
-- İlk kurulumda 25 karakterlik bir **kurtarma anahtarı** bir kez gösterilir. Yönetici parolasını unutursa giriş ekranındaki **Parolamı unuttum** ile bu anahtarla yeni parola belirler. Anahtar kaybolursa ve hiçbir yönetici parolasını hatırlamıyorsa şifreli veri açılamaz.
+- İlk kurulumda 25 karakterlik bir **kurtarma anahtarı** bir kez gösterilir. Yönetici parolasını unutursa giriş ekranındaki **Parolamı unuttum** ile bu anahtarla yeni parola belirler. Anahtar kaybolursa ya da başkasının eline geçerse yönetici **Yedek → Kurtarma anahtarı** ile kendi parolasını girip yenisini üretir; eskisi geçersiz olur. Anahtar kaybolmuş ve hiçbir yönetici parolasını hatırlamıyorsa şifreli veri açılamaz; bu, şifrelemenin gereğidir.
 - Oturum kapanınca anahtar bellekten silinir.
 
 **Referans veri bütünlüğü**
@@ -62,17 +62,25 @@ Geliştiren: **Umay Hüma Çetin**
 - Günlük **Veri ve modeller → Günlük** sekmesinden okunur: seviyeye göre süzülür, metinle aranır, **Denetle** zinciri baştan doğrular.
 - Veritabanına yazılamayan hatalar ayrıca `%AppData%\EcoBuildss\hata.log` dosyasına yazılır.
 
+**Fiyat güncelleme**
+- Yönetici **Fiyatlar** sekmesinden malzeme, yakıt ve doğal gaz/elektrik tarifelerini günceller. Kaynak yazmak zorunludur; eski ve yeni değer günlüğe yazılır.
+- Referans dosyalar değişmez (bütünlük denetimi bozulmaz). Güncel fiyat veritabanında tutulur, **Referansa dön** ile geri alınır.
+
 **Yedek**
 - Program her gün ilk açılışta otomatik yedek alır ve son 14 günün yedeğini saklar.
-- Yönetici **Yedek** sekmesinden istediği an yedek alabilir ve yedekten geri yükleyebilir. Geri yüklemeden önce mevcut durum ayrıca yedeklenir; geri yüklemeden sonra yeniden giriş istenir.
+- Yönetici **Fiyat güncelleme**
+- Yönetici **Fiyatlar** sekmesinden malzeme, yakıt ve doğal gaz/elektrik tarifelerini günceller. Kaynak yazmak zorunludur; eski ve yeni değer günlüğe yazılır.
+- Referans dosyalar değişmez (bütünlük denetimi bozulmaz). Güncel fiyat veritabanında tutulur, **Referansa dön** ile geri alınır.
+
+**Yedek** sekmesinden istediği an yedek alabilir ve yedekten geri yükleyebilir. Geri yüklemeden önce mevcut durum ayrıca yedeklenir; geri yüklemeden sonra yeniden giriş istenir.
 - Yedekler SQLite'ın çevrimiçi yedekleme arayüzüyle alınır, yani tutarlıdır.
 
-**Sınır:** Tablo ve sütun adları, tarih, il ve alan gibi hesap için gereken alanlar düz tutulur; kişisel ve ticari bilgi şifrelidir. Yedekler de aynı şekilde şifreli alanlarla alınır.
+**Sınır:** Teklif numarası, tarih ve sonuç (Bekliyor/Kabul/Red) düz tutulur; numaralama ve sıralama bunlarla yapılır. Kullanıcı adları, roller ve güncellenen fiyatlar da düzdür. Yedekler şifreli alanlarıyla alınır.
 
 | | |
 |---|---|
 | ![Günlük](docs/ekran/08_gunluk.png) | ![Yedek](docs/ekran/09_yedek.png) |
-| ![Kullanıcılar](docs/ekran/07_kullanicilar.png) | |
+| ![Kullanıcılar](docs/ekran/07_kullanicilar.png) | ![Fiyatlar](docs/ekran/10_fiyatlar.png) |
 
 ## Kurulum
 
@@ -125,17 +133,18 @@ dotnet run --project tests/EcoBuildss.Tests
 python araclar/dogrulama/bagimsiz_dogrulama.py <klasör>   # isteğe bağlı: pandas, scikit-learn
 ```
 
-96 test vardır ve şunları kapsar:
+106 test vardır ve şunları kapsar:
 - metrikler (F1, AUC, CV(RMSE))
 - regresyon ve gerçek levha fiyatları
 - enerji motoru ve yangın yönetmeliği kuralı
 - hatalı CSV satırlarının reddi
 - uçtan uca veri akışı (test içinde üretilen sentetik veriyle)
+- pencere çevresi yangın bariyeri alanı, dikdörtgen olmayan plan
 - referans veri bütünlüğü; 81 ilin hepsinde TS 825'e uyan paket bulunması
 - az veride ve sinyalsiz veride kalite eşiğinin modeli reddetmesi
 - apartman hesabı (kapsam, faturadan tasarruf, taksit)
 - SQLite kaydı (parametreli sorgu)
-- güvenlik: parola özeti, kilitleme, roller, geçici parola, alan şifreleme ve değiştirilmiş şifreli değerin yakalanması, kurtarma anahtarı, günlük zinciri ve değişiklik tespiti, yedek ve geri yükleme
+- güvenlik: parola özeti, kilitleme, roller, geçici parola, alan şifreleme ve değiştirilmiş şifreli değerin yakalanması, kurtarma anahtarı ve yenilenmesi, teklif ayrıntılarının diskte şifreli olması, fiyat güncelleme ve geri alma, günlük zinciri ve değişiklik tespiti, yedek ve geri yükleme
 
 ## Klasörler
 
@@ -157,9 +166,11 @@ docs/                   Veri sözlüğü, ekran görüntüleri
 
 ## Sınırlılıklar
 
-- Enerji modeli yıllık derece-gün yöntemidir. Güneş kazancı ve ısıl kütle ayrı hesaplanmaz. Kalibrasyon bu sapmayı gerçek tüketimle toplu olarak düzeltir.
-- Bina dikdörtgen plan olarak girilir. Dikdörtgen olmayan planlar için çekirdekte `Bina.Alanlarla(...)` vardır.
-- Referans fiyatlar Kasım 2026 tarihlidir. Malzeme ve tarife güncellemesi `veri/referans` dosyalarından yapılır; her satırda kaynak ve tarih bulunur.
+- Enerji modeli yıllık derece-gün yöntemidir. MGM derece-günü 15 °C eşikle hesaplandığı için ortalama güneş ve iç kazançlar denge sıcaklığında zaten vardır; cepheye göre güneş kazancı ayrıca hesaplanmaz (ikinci kez sayılmasın diye). Bina bazındaki sapmayı kalibrasyon gerçek tüketimle düzeltir.
+- Dikdörtgen olmayan planda (L, U, T) **Ayarlar**'dan plan çevresi ve taban alanı girilir; çizim yaklaşık gösterilir.
+- Pencere yangın bariyeri, pencere ölçüsü girilmediği için tipik 120 × 150 cm pencereyle hesaplanır (`parametreler.csv` B6–B7).
+- Kabul tahmininin F1 ≥ 0,87 sonucu test verisindedir. Gerçek veride model, eşiği geçmedikçe gösterilmez.
+- Referans fiyatlar dosyalardaki tarihlidir; güncel fiyat **Fiyatlar** sekmesinden girilir.
 
 ## Lisans
 

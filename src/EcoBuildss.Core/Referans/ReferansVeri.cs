@@ -31,6 +31,15 @@ namespace EcoBuildss.Core
                               CatiAlani = taban, ZeminAlani = taban, KullanimAlani = taban * kat, Hacim = taban * h };
         }
 
+        /// <summary>Dikdörtgen olmayan plan (L, U, T…): taban alanı ve dış çevre uzunluğu projeden okunur; katlar aynı plandadır.</summary>
+        public static Bina Plan(double cevre, double taban, int kat, double katYuksekligi)
+        {
+            if (cevre <= 0 || taban <= 0 || kat <= 0 || katYuksekligi <= 0) throw new ArgumentException("Bina ölçüleri sıfırdan büyük olmalı.");
+            if (cevre * cevre < 4 * Math.PI * taban * 0.999) throw new ArgumentException("Bu çevre bu taban alanını çevreleyemez (çevre çok kısa).");
+            double h = kat * katYuksekligi;
+            return new Bina { KatSayisi = kat, Yukseklik = h, DisDuvarAlani = cevre * h, CatiAlani = taban, ZeminAlani = taban, KullanimAlani = taban * kat, Hacim = taban * h };
+        }
+
         /// <summary>Projeden okunan alanlarla bina (dikdörtgen olmayan planlar için).</summary>
         public static Bina Alanlarla(double disDuvar, double cati, double zemin, double kullanim, double hacim, double yukseklik, int kat)
         {
@@ -158,7 +167,7 @@ namespace EcoBuildss.Core
     }
 
     /// <summary>Veri klasöründeki üç CSV dosyasını okur.</summary>
-    public sealed class VeriDeposu
+    public sealed partial class VeriDeposu
     {
         public List<Malzeme> Malzemeler { get; } = new();
         public Dictionary<string, double> Parametre { get; } = new();

@@ -138,6 +138,8 @@ namespace EcoBuildss.UI
             sonEtkinlik = DateTime.Now;
             icerik.Visible = true;
             OturumuYansit();
+            d.FiyatlariUygula();
+            d.VeriDegistiDuyur();
             d.TekliflerDegistiDuyur();
             d.Bildir($"Oturum açıldı: {d.Kullanici?.AdSoyad}.");
             bekleme.Start();
