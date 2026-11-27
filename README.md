@@ -109,6 +109,10 @@ Hiçbir NuGet paketi gerekmez. SQLite'a Windows'un kendi `winsqlite3.dll` dosyas
      - "her teklife kabul de" tahmininden belirgin iyi olmak
 
      Sağlamazsa teklif ekranında **gösterilmez**.
+
+     Model güvenilirse teklif ekranında **İndirim** bağlantısı çıkar: her indirim oranında kabul olasılığı, kâr ve beklenen kâr (olasılık × kâr) hesaplanır; beklenen kârı en yüksek, zarar ettirmeyen indirim önerilir ve **Uygula** ile teklife işlenir.
+
+     ![İndirim](docs/ekran/11_indirim.png)
 5. Uygulamada verilen her teklifi kaydedin, sonucu belli olunca **Tekliflerim** ekranında Kabul/Red işaretleyin. Model bu kayıtlarla kendini yeniden kurar.
 
 ## Modeller ve doğrulama
@@ -135,7 +139,7 @@ dotnet run --project tests/EcoBuildss.Tests
 python araclar/dogrulama/bagimsiz_dogrulama.py <klasör>   # isteğe bağlı: pandas, scikit-learn
 ```
 
-112 test vardır ve şunları kapsar:
+116 test vardır ve şunları kapsar:
 - metrikler (F1, AUC, CV(RMSE))
 - regresyon ve gerçek levha fiyatları
 - enerji motoru ve yangın yönetmeliği kuralı

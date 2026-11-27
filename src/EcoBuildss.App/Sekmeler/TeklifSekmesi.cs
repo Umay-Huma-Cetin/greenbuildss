@@ -38,6 +38,7 @@ namespace EcoBuildss.UI
         readonly CheckBox klima = new() { Text = "Klima var", AutoSize = true }, rakip = new() { Text = "Rakip teklif var", AutoSize = true };
         readonly NumericUpDown cevre = Sayi(0, 2000, 0, 1), taban = Sayi(0, 50000, 0, 0);
         readonly Panel digerPanel = new() { AutoSize = true, Visible = false };
+        readonly LinkLabel indirimLink = new() { Text = "İndirim", AutoSize = true, LinkColor = Ui.Yesil, Visible = false };
         readonly Label mevcutEtiket = Ui.Etiket("Mevcut duvar U (W/m²K)"), ilBilgi = Ui.Aciklama("", 240);
         // ---- sonuçlar ----
         readonly List<PaketKarti> paketKartlari = new();
@@ -142,6 +143,7 @@ namespace EcoBuildss.UI
             var ozSol = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             var tutarSatiri = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
             tutarSatiri.Controls.Add(ozTutar); ozAlt.Margin = new Padding(6, 14, 18, 0); tutarSatiri.Controls.Add(ozAlt); ozKabul.Margin = new Padding(0, 12, 0, 0); tutarSatiri.Controls.Add(ozKabul);
+            indirimLink.Margin = new Padding(8, 15, 0, 0); indirimLink.LinkClicked += (_, __) => IndirimAnalizi(); tutarSatiri.Controls.Add(indirimLink);
             ozSol.Controls.Add(tutarSatiri); ozSol.Controls.Add(ozSatir); ozSol.Controls.Add(ozNot);
             var ozSag = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(0, 8, 0, 0) };
             var kaydet = Ui.Dugme("Kaydet", (_, __) => Kaydet(), true); kaydet.Width = 170; kaydet.AutoSize = false; kaydet.Height = 36;
@@ -225,22 +227,61 @@ namespace EcoBuildss.UI
             catch (Exception e) { d.Hata("Hesap yapılamadı: " + e.Message, e); }
         }
 
-        PaketTeklifi PaketHesapla(string ad, Secenek s)
+        PaketTeklifi PaketHesapla(string ad, Secenek s, double? indirimOrani = null)
         {
             var r = SonSonuc!;
-            double carpan = (1 + (double)kar.Value / 100) * (1 - (double)indirim.Value / 100);
+            double ind = indirimOrani ?? (double)indirim.Value / 100;
+            double carpan = (1 + (double)kar.Value / 100) * (1 - ind);
             var p = new PaketTeklifi { Ad = ad, S = s, Maliyet = s.IlkYatirim, TeklifTL = s.IlkYatirim * carpan };
             p.TeklifTLm2 = p.TeklifTL / r.KullanimAlani;
             if (r.Mevcut) p.GeriOdeme = Kpi.IskontoluGeriOdeme(p.TeklifTL, r.MevcutGiderTL - s.YillikGiderTL, r.EnerjiIskonto);
             else if (ekonomikSecenek != null) p.GeriOdeme = Kpi.IskontoluGeriOdeme((s.IlkYatirim - ekonomikSecenek.IlkYatirim) * carpan, ekonomikSecenek.YillikGiderTL - s.YillikGiderTL, r.EnerjiIskonto);
-            if (d.Kabul?.Guvenilir == true) p.KabulOlasiligi = d.Kabul.Olasilik(Ozellik(p), d.V);
+            if (d.Kabul?.Guvenilir == true) p.KabulOlasiligi = d.Kabul.Olasilik(Ozellik(p, ind), d.V);
             return p;
         }
 
-        TeklifOzellik Ozellik(PaketTeklifi p) => new()
+        /// <summary>İndirim kararı: her indirim oranında kabul olasılığı ve beklenen kâr; en iyisi önerilir.</summary>
+        void IndirimAnalizi()
+        {
+            if (secili == null || SonSonuc == null || d.Kabul?.Guvenilir != true) return;
+            var sec = secili;
+            double mevcut = (double)indirim.Value / 100, k = (double)kar.Value / 100;
+            // Kârın tamamen eridiği noktanın biraz ötesine kadar (en çok %30)
+            var egri = EcoBuildss.Core.Uygulamalar.IndirimAnalizi.Egri(i => { var p = PaketHesapla(sec.Ad, sec.S, i); return (p.KabulOlasiligi ?? 0, p.TeklifTL); }, sec.Maliyet,
+                                                                         Math.Min(0.30, k / (1 + k) + 0.02));
+            var en = EcoBuildss.Core.Uygulamalar.IndirimAnalizi.EnIyi(egri);
+            var simdi = egri.OrderBy(n => Math.Abs(n.Indirim - mevcut)).First();
+
+            using var f = new Form { Text = "İndirim", StartPosition = FormStartPosition.CenterParent, ClientSize = new Size(760, 520), BackColor = Color.White, Font = Ui.Yazi, MinimizeBox = false };
+            var grafik = new SacilimGrafik { Dock = DockStyle.Fill, XBaslik = "İndirim (%)", YBaslik = "Beklenen kâr (TL)", XBicim = x => (x * 100).ToString("0"), SeriAd = new[] { "Beklenen kâr" } };
+            grafik.Cizgiler.Add(new SacilimGrafik.Cizgi { Noktalar = egri.Select(n => (n.Indirim, n.BeklenenKar)).ToList(), Seri = 0 });
+            if (en != null) grafik.Dikeyler.Add((en.Indirim, "en iyi", 1));
+            grafik.Dikeyler.Add((simdi.Indirim, "şimdi", 2));
+            var tablo = Ui.Izgara(); tablo.Dock = DockStyle.Fill;
+            foreach (var c in new[] { "İndirim", "Teklif (KDV hariç)", "Kabul olasılığı", "Kâr", "Beklenen kâr" }) tablo.Columns.Add(c, c);
+            foreach (var n in egri.Where((n, i) => i % 2 == 0 || n == en))
+            {
+                int i = tablo.Rows.Add("%" + (n.Indirim * 100).ToString("0"), Ui.Tl(n.TeklifTL), Ui.Olasilik(n.Olasilik), Ui.Tl(n.Kar), Ui.Tl(n.BeklenenKar));
+                if (n == en) tablo.Rows[i].DefaultCellStyle.BackColor = Ui.AcikYesil;
+            }
+            var ozetEt = new Label { Dock = DockStyle.Top, Height = 34, Font = Ui.Kalin, Padding = new Padding(10, 8, 0, 0),
+                Text = en == null ? "Hiçbir indirimde kâr kalmıyor." :
+                    $"En iyi: %{en.Indirim * 100:0} indirim · olasılık {Ui.Olasilik(en.Olasilik)} · beklenen kâr {Ui.Tl(en.BeklenenKar)}   (şimdi: {Ui.Tl(simdi.BeklenenKar)})" };
+            var alt = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8) };
+            var uygula = Ui.Dugme("Uygula", (_, __) => { if (en != null) { indirim.Value = (decimal)Math.Round(en.Indirim * 100, 1); d.Db?.Gunluk("İndirim önerisi uygulandı", $"%{en.Indirim * 100:0}"); } f.Close(); }, true);
+            uygula.Enabled = en != null;
+            alt.Controls.Add(uygula);
+            var bolme = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal };
+            bolme.Panel1.Controls.Add(grafik); bolme.Panel2.Controls.Add(tablo);
+            f.Controls.Add(bolme); f.Controls.Add(ozetEt); f.Controls.Add(alt);
+            f.Shown += (_, __) => { try { bolme.SplitterDistance = bolme.Height / 2; } catch { } };
+            f.ShowDialog(this);
+        }
+
+        TeklifOzellik Ozellik(PaketTeklifi p, double? indirimOrani = null) => new()
         {
             Il = SeciliIl.Ad, MusteriTipi = (string)musteriTipi.SelectedItem!, ProjeTuru = (string)projeTuru.SelectedItem!, Paket = p.Ad, Oncelik = SeciliOncelik,
-            KullanimAlani = SonSonuc!.KullanimAlani, TeklifTLm2 = p.TeklifTLm2, IndirimOrani = (double)indirim.Value / 100, YanitSuresiGun = (double)yanit.Value,
+            KullanimAlani = SonSonuc!.KullanimAlani, TeklifTLm2 = p.TeklifTLm2, IndirimOrani = indirimOrani ?? (double)indirim.Value / 100, YanitSuresiGun = (double)yanit.Value,
             GeriOdemeYil = p.GeriOdeme, RakipTeklif = rakip.Checked,
         };
 
@@ -279,7 +320,8 @@ namespace EcoBuildss.UI
             ozSatir.Text = $"{TeklifRaporu.PaketAdi(s)}   ·   {tasarruf}   ·   {geri}   ·   {(s.Ts825Uygun ? "TS 825'e uygun ✓" : "TS 825'e uygun değil")}";
             ozKabul.Text = p.KabulOlasiligi is double k2 ? $"Kazanma olasılığı {Ui.Olasilik(k2)}" : "";
             ozKabul.ForeColor = (p.KabulOlasiligi ?? 1) >= 0.5 ? Ui.Yesil : Ui.Kirmizi;
-            ozNot.Text = s.YanginEkMaliyet > 0 ? s.YanginNotu + "." : "";
+            indirimLink.Visible = p.KabulOlasiligi.HasValue;
+            ozNot.Text = s.YanginEkMaliyet > 0 ? s.YanginNotu : "";
         }
 
         /// <summary>Mühendis bir malzeme kartına tıklayınca seçili paketin yalnız o bileşeni değişir; teklif anında yeniden hesaplanır.</summary>
