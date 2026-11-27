@@ -53,7 +53,9 @@ namespace EcoBuildss.UI
             try { if (d.Db.OtomatikYedek() is string y) d.Bildir("Yedek alındı."); }
             catch (Exception e) { d.Hata("Otomatik yedek alınamadı: " + e.Message, e); }
             using var g = new GirisFormu(d.Db);
-            return g.ShowDialog() == DialogResult.OK ? d : null;
+            if (g.ShowDialog() != DialogResult.OK) return null;
+            d.FiyatlariUygula();
+            return d;
         }
     }
 }

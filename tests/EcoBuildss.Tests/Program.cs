@@ -44,6 +44,29 @@ static class Testler
             Directory.Delete(gecici, true);
             var uygunsuz = v.Iller.Where(il => KararMotoru.Hesapla(v, new Girdi { Bina = Bina.Dikdortgen(12, 18, 4, 2.9), Il = il, Bolge = il.Ts825Bolge ?? 4, SadeceTs825 = true }).Siralama.Count == 0).Select(il => il.Ad).ToList();
             Dogrula(uygunsuz.Count == 0, "81 ilin hepsinde TS 825'e uyan en az bir paket var", string.Join(", ", uygunsuz));
+            {
+                var pl = Bina.Plan(80, 300, 5, 3);
+                bool kisa = false; try { Bina.Plan(40, 300, 5, 3); } catch (ArgumentException) { kisa = true; }
+                Dogrula(pl.DisDuvarAlani == 1200 && pl.KullanimAlani == 1500 && pl.Hacim == 4500 && kisa, "Dikdörtgen olmayan plan: çevre ve taban alanından bina; imkânsız çevre reddedilir");
+            }
+            {
+                var r4 = KararMotoru.Hesapla(v, new Girdi { Bina = Bina.Dikdortgen(12, 18, 4, 2.9), Il = v.VarsayilanIl, Bolge = 4 });
+                var r2 = KararMotoru.Hesapla(v, new Girdi { Bina = Bina.Dikdortgen(12, 18, 2, 2.9), Il = v.VarsayilanIl, Bolge = 4 });
+                double b4 = KararMotoru.BariyerAlani(v, r4);
+                Dogrula(KararMotoru.BariyerAlani(v, r2) == 0 && Math.Abs(b4 - r4.CamAlani * 0.5) < 1e-6,
+                        "Pencere yangın bariyeri: 6,5 m altı yok; üstünde 120×150 pencerede pencere alanının yarısı kadar", $"{b4:0.0} m², cam {r4.CamAlani:0.0} m²");
+            }
+            {
+                var vf = VeriDeposu.Yukle(Path.Combine(Kok(), "veri", "referans"));
+                double ilk = vf.Malzemeler.First(m => m.Id == "Y2").FiyatM2, gazIlk = vf.P("E1");
+                vf.FiyatUygula("Y2", ilk * 1.5, "Tedarikçi teklifi", "01.12.2026"); vf.FiyatUygula("E1", gazIlk + 1, "BOTAŞ", "");
+                bool degisti = vf.Malzemeler.First(m => m.Id == "Y2").FiyatM2 == ilk * 1.5 && vf.P("E1") == gazIlk + 1 && vf.FiyatKalemleri().Count(k => k.Guncellendi) == 2;
+                vf.FiyatReferansaDon("Y2"); vf.FiyatReferansaDon("E1");
+                Dogrula(degisti && vf.Malzemeler.First(m => m.Id == "Y2").FiyatM2 == ilk && vf.P("E1") == gazIlk && vf.FiyatKalemleri().All(k => !k.Guncellendi),
+                        "Fiyat güncellenir ve referansa geri döner");
+                bool red = false; try { vf.FiyatUygula("KDV", 0.5, "x", ""); } catch (ArgumentException) { red = true; }
+                Dogrula(red, "Fiyat olmayan parametre güncellenemez");
+            }
         }
 
         Bolum("Matematik ve metrikler");
@@ -284,6 +307,13 @@ static class Testler
                 Dogrula(File.Exists(yedek), "Elle yedek alınır");
                 db.TeklifKaydet(new KayitliTeklif { TeklifNo = db.YeniTeklifNo(), Il = "Malatya", KullanimAlani = 100, TeklifTL = 1, TeklifTLm2 = 1 });
                 Dogrula(db.Teklifler().Count == 2, "Yedekten sonra yeni teklif");
+                db.FiyatKaydet("Y2", 900, "Tedarikçi teklifi", 865);
+                Dogrula(db.FiyatGuncellemeleri().Single() is var fg && fg.id == "Y2" && fg.fiyat == 900 && fg.kaynak == "Tedarikçi teklifi", "Fiyat güncellemesi veritabanında saklanır");
+                db.FiyatSil("Y2");
+                var t2 = db.Teklifler().First(x => x.Il == "Malatya" && x.TeklifTL == 1);
+                Dogrula(t2.KullanimAlani == 100 && t2.Hazirlayan == "ayse", "Şifreli teklif ayrıntıları eksiksiz geri okunur");
+                string sonNo = db.YeniTeklifNo(); db.TeklifSil(db.Teklifler().OrderBy(x => x.TeklifNo).First().Id);
+                Dogrula(db.YeniTeklifNo() == sonNo, "Teklif silinse de yeni numara çakışmaz");
                 db.GeriYukle(yedek);
                 Dogrula(db.Aktif == null, "Geri yüklemeden sonra yeniden oturum açılmalı");
                 db.GirisYap("ayse", "Gizli2026!");
@@ -308,6 +338,8 @@ static class Testler
             {
                 var tek1 = ham.Sorgu("SELECT musteri, teklif_tl, gizli FROM teklifler")[0];
                 Dogrula((string)tek1["musteri"]! == "" && Convert.ToDouble(tek1["teklif_tl"]) == 0 && ((string)tek1["gizli"]!).StartsWith("e1:"), "Teklifte müşteri ve tutar diskte şifreli");
+                Dogrula(ham.Sorgu("SELECT il, paket, hazirlayan, kullanim_alani, en FROM teklifler").All(r => (string)r["il"]! == "" && (string)r["paket"]! == "" && (string)r["hazirlayan"]! == "" && Convert.ToDouble(r["kullanim_alani"]) == 0 && r["en"] == null),
+                        "Teklifin il, paket, alan, ölçü ve hazırlayanı da diskte şifreli");
                 Dogrula(ham.Sorgu("SELECT satir FROM veri_kayitlari").All(r => ((string)r["satir"]!).StartsWith("e1:")), "İçe aktarılan veri diskte şifreli");
                 Dogrula(!ham.Sorgu("SELECT ayrinti FROM islem_gunlugu WHERE islem = 'Teklif kaydedildi'").Any(r => ((string)r["ayrinti"]!).Contains("Malatya")), "Günlük ayrıntısı diskte şifreli");
                 Dogrula(ham.Sorgu("SELECT sarili FROM anahtarlar").Count >= 3, "Veri anahtarı her kullanıcı ve kurtarma için ayrı sarılı");
@@ -319,6 +351,11 @@ static class Testler
                 Dogrula(kurtarma != null && kurtarma.Length == 29, "İlk kurulumda kurtarma anahtarı üretilir");
                 db.KurtarmaIleSifirla("ayse", kurtarma!.ToLowerInvariant().Replace("-", " "), "Yeni2026xx");
                 Dogrula(db.GirisYap("ayse", "Yeni2026xx") == GirisSonucu.Basarili && db.Teklifler()[0].TeklifTL == 500000, "Kurtarma anahtarıyla parola yenilenir, veri okunur");
+                bool red = false; try { db.KurtarmaAnahtariYenile("yanlis-parola1"); } catch (UnauthorizedAccessException) { red = true; }
+                Dogrula(red, "Kurtarma anahtarı yenilemek için parola gerekir");
+                string yeniK = db.KurtarmaAnahtariYenile("Yeni2026xx");
+                bool eskiGecmez = false; try { db.KurtarmaIleSifirla("ayse", kurtarma!, "Baska2026xx"); } catch (ArgumentException) { eskiGecmez = true; }
+                Dogrula(eskiGecmez && yeniK != kurtarma, "Yeni kurtarma anahtarından sonra eskisi geçersiz");
                 db.OturumKapat();
                 Dogrula(db.GirisYap("ayse", "Gizli2026!") == GirisSonucu.HataliBilgi, "Eski parola artık geçmez");
             }

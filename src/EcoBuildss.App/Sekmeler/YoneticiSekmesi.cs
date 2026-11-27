@@ -14,6 +14,7 @@ namespace EcoBuildss.UI
             void Ekle(string ad, Control c) { var t = new TabPage(ad) { BackColor = Ui.Zemin }; c.Dock = DockStyle.Fill; t.Controls.Add(c); sekme.TabPages.Add(t); }
             Ekle("Firma", Firma());
             Ekle("Kullanıcılar", Kullanicilar());
+            Ekle("Fiyatlar", Fiyatlar());
             Ekle("Günlük", Gunluk());
             Ekle("Yedek", Yedek());
             Ekle("Veri", new VeriSekmesi(d));
@@ -104,6 +105,63 @@ namespace EcoBuildss.UI
             return f;
         }
 
+        // ======================= Fiyatlar =======================
+        Control Fiyatlar()
+        {
+            var liste = Ui.Izgara();
+            void Doldur()
+            {
+                liste.Columns.Clear(); liste.Rows.Clear();
+                foreach (var c in new[] { "Kod", "Kalem", "Tür", "Fiyat", "Birim", "Kaynak", "Tarih" }) liste.Columns.Add(c, c);
+                liste.Columns[1].FillWeight = 220; liste.Columns[5].FillWeight = 220;
+                liste.Columns[3].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                foreach (var k in d.V.FiyatKalemleri())
+                {
+                    int i = liste.Rows.Add(k.Id, k.Ad, k.Tur, k.Fiyat.ToString("#,0.00##", Ui.TR), k.Birim, k.Kaynak, k.Tarih);
+                    liste.Rows[i].Tag = k;
+                    if (k.Guncellendi) liste.Rows[i].DefaultCellStyle.BackColor = Ui.AcikYesil;
+                }
+            }
+            FiyatKalemi? Secili() => liste.CurrentRow?.Tag as FiyatKalemi;
+            void Guncelle(FiyatKalemi k)
+            {
+                using var f = Pencere($"{k.Id} · fiyat", 250);
+                var p = (FlowLayoutPanel)f.Controls[0];
+                var fiyat = new TextBox { Width = 300, Text = k.Fiyat.ToString("0.####", Ui.TR) };
+                var kaynak = new TextBox { Width = 300 };
+                var mesaj = new Label { AutoSize = true, MaximumSize = new Size(300, 0), ForeColor = Ui.Kirmizi };
+                p.Controls.Add(Ui.Etiket($"Fiyat ({k.Birim}, KDV hariç)")); p.Controls.Add(fiyat); p.Controls.Add(Ui.Etiket("Kaynak")); p.Controls.Add(kaynak); p.Controls.Add(mesaj);
+                var tamam = Ui.Dugme("Kaydet", (_, __) =>
+                {
+                    if (!double.TryParse(fiyat.Text.Trim(), System.Globalization.NumberStyles.Number, Ui.TR, out var x) || x <= 0) { mesaj.Text = "Geçerli bir fiyat girin."; return; }
+                    if (kaynak.Text.Trim().Length < 3) { mesaj.Text = "Kaynağı yazın (tedarikçi, fatura, liste)."; return; }
+                    try
+                    {
+                        string tarih = DateTime.Today.ToString("dd.MM.yyyy");
+                        d.V.FiyatUygula(k.Id, x, kaynak.Text.Trim(), tarih);
+                        d.Db!.FiyatKaydet(k.Id, x, kaynak.Text.Trim(), k.Fiyat);
+                        f.DialogResult = DialogResult.OK;
+                    }
+                    catch (Exception e) { mesaj.Text = e.Message; }
+                }, true);
+                p.Controls.Add(tamam); f.AcceptButton = tamam;
+                if (f.ShowDialog(this) == DialogResult.OK) { Doldur(); d.VeriDegistiDuyur(); d.Bildir($"{k.Id} fiyatı güncellendi."); }
+            }
+            var ust = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8, 6, 8, 0) };
+            ust.Controls.Add(Ui.Dugme("Güncelle", (_, __) => { if (Secili() is FiyatKalemi k) Guncelle(k); }, true));
+            ust.Controls.Add(Ui.Dugme("Referansa dön", (_, __) =>
+            {
+                if (Secili() is not FiyatKalemi k || !k.Guncellendi) return;
+                try { d.Db!.FiyatSil(k.Id); d.V.FiyatReferansaDon(k.Id); Doldur(); d.VeriDegistiDuyur(); }
+                catch (Exception e) { Ui.Hata(this, e.Message); }
+            }));
+            liste.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0 && Secili() is FiyatKalemi k) Guncelle(k); };
+            var p = new Panel();
+            p.Controls.Add(Ui.Kart("Fiyatlar", liste)); p.Controls.Add(ust);
+            p.VisibleChanged += (_, __) => { if (p.Visible) Doldur(); };
+            return p;
+        }
+
         // ======================= Günlük =======================
         Control Gunluk()
         {
@@ -168,11 +226,30 @@ namespace EcoBuildss.UI
                 try { d.Db!.GeriYukle(yol); GeriYuklendi?.Invoke(); }
                 catch (Exception e) { d.Hata("Geri yüklenemedi: " + e.Message, e); Ui.Hata(this, "Geri yüklenemedi: " + e.Message); }
             }));
+            ust.Controls.Add(Ui.Dugme("Kurtarma anahtarı", (_, __) => KurtarmaYenile()));
             ust.Controls.Add(Ui.Dugme("Klasör", (_, __) => { try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(d.Db!.YedekKlasoru) { UseShellExecute = true }); } catch { } }));
             var p = new Panel();
             p.Controls.Add(Ui.Kart("Yedekler", yedekler)); p.Controls.Add(ust);
             p.VisibleChanged += (_, __) => { if (p.Visible) Doldur(); };
             return p;
+        }
+
+        void KurtarmaYenile()
+        {
+            using var f = Pencere("Yeni kurtarma anahtarı", 200);
+            var p = (FlowLayoutPanel)f.Controls[0];
+            var par = new TextBox { Width = 300, UseSystemPasswordChar = true };
+            var mesaj = new Label { AutoSize = true, MaximumSize = new Size(300, 0), ForeColor = Ui.Kirmizi };
+            p.Controls.Add(Ui.Etiket("Parolanız")); p.Controls.Add(par); p.Controls.Add(mesaj);
+            var tamam = Ui.Dugme("Oluştur", (_, __) =>
+            {
+                f.Cursor = Cursors.WaitCursor;
+                try { d.Db!.KurtarmaAnahtariYenile(par.Text); f.DialogResult = DialogResult.OK; }
+                catch (Exception e) { mesaj.Text = e.Message; }
+                finally { f.Cursor = Cursors.Default; }
+            }, true);
+            p.Controls.Add(tamam); f.AcceptButton = tamam;
+            if (f.ShowDialog(this) == DialogResult.OK) GirisFormu.KurtarmaAnahtariniGoster(this, d.Db!);
         }
 
         /// <summary>Yedekten geri yüklenince yeniden oturum açılmalı (yedekteki kullanıcılar ve anahtarlar geçerli olur).</summary>

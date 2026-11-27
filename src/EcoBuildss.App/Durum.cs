@@ -46,6 +46,16 @@ namespace EcoBuildss.UI
             catch { }
         }
         public void VeriDegistiDuyur() => VeriDegisti?.Invoke();
+
+        /// <summary>Veritabanındaki güncel fiyatları referans veriye uygular (önce hepsi referansa döner, yedekten dönüşte de doğru olsun).</summary>
+        public void FiyatlariUygula()
+        {
+            foreach (var k in V.FiyatKalemleri().Where(k => k.Guncellendi)) V.FiyatReferansaDon(k.Id);
+            if (Db == null) return;
+            foreach (var (id, fiyat, kaynak, tarih) in Db.FiyatGuncellemeleri())
+                try { V.FiyatUygula(id, fiyat, kaynak, tarih); }
+                catch (Exception e) { Hata($"{id} fiyatı uygulanamadı: {e.Message}", e); }
+        }
         public void ModellerDegistiDuyur() => ModellerDegisti?.Invoke();
         public void TekliflerDegistiDuyur() => TekliflerDegisti?.Invoke();
 
