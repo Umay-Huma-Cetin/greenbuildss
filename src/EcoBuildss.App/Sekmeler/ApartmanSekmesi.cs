@@ -99,6 +99,7 @@ namespace EcoBuildss.UI
             var binaKart = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6) }; binaKart.Controls.Add(bina);
             var dugmeler = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 48, Padding = new Padding(6, 6, 0, 0), BackColor = Color.White };
             dugmeler.Controls.Add(Ui.Dugme("Yazdır", (_, __) => Yazdir(), true));
+            dugmeler.Controls.Add(Ui.Dugme("PDF", (_, __) => Pdf()));
             dugmeler.Controls.Add(Ui.Dugme("Kaydet", (_, __) => Kaydet()));
             var orta = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8, 8, 8, 0) };
             orta.Controls.Add(binaKart); orta.Controls.Add(notPanel); orta.Controls.Add(ozet); orta.Controls.Add(kartSatiri); orta.Controls.Add(dugmeler);
@@ -247,6 +248,15 @@ namespace EcoBuildss.UI
             belge.EndPrint += (_, e) => { if (e.PrintAction == PrintAction.PrintToPrinter) d.Db?.Gunluk("Toplantı sayfası yazdırıldı", $"{ad.Text} · {SeciliIl.Ad} · {Ui.Tl(a.DaireBasiTL)}/daire"); };
             using var o = new PrintPreviewDialog { Document = belge, Width = 900, Height = 1000 };
             o.ShowDialog(this);
+        }
+
+        void Pdf()
+        {
+            if (paketler.Count == 0 || SonSonuc == null) return;
+            var a = paketler[seciliIndeks].a;
+            string adi = ad.Text.Trim().Length > 0 ? ad.Text.Trim() : "Apartman";
+            PdfCikti.Kaydet(this, d, $"{string.Concat(adi.Split(Path.GetInvalidFileNameChars()))}_mantolama_{DateTime.Today:yyyyMMdd}.pdf", $"{adi} — mantolama teklifi",
+                            SayfaCiz, "Toplantı sayfası PDF", $"{adi} · {SeciliIl.Ad} · {Ui.Tl(a.NetDaireTL)}/daire");
         }
 
         /// <summary>Toplantı sayfasının çizimi (yazıcı ya da PDF için).</summary>

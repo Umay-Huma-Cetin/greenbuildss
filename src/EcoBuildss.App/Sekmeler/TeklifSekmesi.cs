@@ -399,6 +399,12 @@ namespace EcoBuildss.UI
             var alt = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 44, Padding = new Padding(8, 4, 0, 0) };
             alt.Controls.Add(Ui.Dugme("Excel", (_, __) => Excel(f)));
             alt.Controls.Add(Ui.Dugme("Yazdır", (_, __) => Yazdir(kesif, gerekce.Text, f)));
+            alt.Controls.Add(Ui.Dugme("PDF", (_, __) =>
+            {
+                var satirlar = YaziSatirlari(kesif, gerekce.Text);
+                PdfCikti.Kaydet(f, d, $"EcoBuildss_teklif_{SeciliIl.Ad}_{DateTime.Today:yyyyMMdd}.pdf", "EcoBuildss malzeme teklifi",
+                                (g, m) => TeklifSayfaCiz(g, m, satirlar), "Teklif PDF", $"{SeciliIl.Ad} · {secili?.Ad}");
+            }));
             f.Controls.Add(sekme); f.Controls.Add(alt);
             f.ShowDialog(this);
         }
@@ -463,7 +469,7 @@ namespace EcoBuildss.UI
             catch (Exception e) { d.Hata("Excel dosyası yazılamadı: " + e.Message, e); Ui.Hata(sahip, "Excel dosyası yazılamadı: " + e.Message); }
         }
 
-        void Yazdir(DataGridView kesif, string gerekce, IWin32Window sahip)
+        List<(string a, string b, bool k)> YaziSatirlari(DataGridView kesif, string gerekce)
         {
             var satirlar = new List<(string a, string b, bool k)>
             {
@@ -472,21 +478,29 @@ namespace EcoBuildss.UI
             };
             foreach (DataGridViewRow r in kesif.Rows) satirlar.Add(($"{r.Cells[0].Value} {r.Cells[1].Value}".Trim(), $"{r.Cells[3].Value}", r.DefaultCellStyle.Font == Ui.Kalin));
             satirlar.Add(("", "", false)); satirlar.Add(("Gerekçe", gerekce.Split('\n')[0], false));
+            return satirlar;
+        }
+
+        static void TeklifSayfaCiz(Graphics g, Rectangle m, List<(string a, string b, bool k)> satirlar)
+        {
+            float y = m.Top, x = m.Left, w = m.Width;
+            using var f = new Font("Segoe UI", 9.5f); using var fk = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+            foreach (var (a, b, k) in satirlar)
+            {
+                var ff = k ? fk : f;
+                var boyut = g.MeasureString(a, ff, (int)(w * 0.62));
+                g.DrawString(a, ff, Brushes.Black, new RectangleF(x, y, w * 0.62f, boyut.Height));
+                g.DrawString(b, ff, Brushes.Black, new RectangleF(x + w * 0.64f, y, w * 0.36f, boyut.Height));
+                y += Math.Max(boyut.Height, ff.Height) + 4;
+            }
+        }
+
+        void Yazdir(DataGridView kesif, string gerekce, IWin32Window sahip)
+        {
+            var satirlar = YaziSatirlari(kesif, gerekce);
             var belge = new PrintDocument { DocumentName = "EcoBuildss teklif" };
             belge.EndPrint += (_, e) => { if (e.PrintAction == PrintAction.PrintToPrinter) d.Db?.Gunluk("Teklif yazdırıldı", $"{SeciliIl.Ad} · {secili?.Ad}"); };
-            belge.PrintPage += (_, e) =>
-            {
-                float y = e.MarginBounds.Top, x = e.MarginBounds.Left, w = e.MarginBounds.Width;
-                using var f = new Font("Segoe UI", 9.5f); using var fk = new Font("Segoe UI", 9.5f, FontStyle.Bold);
-                foreach (var (a, b, k) in satirlar)
-                {
-                    var ff = k ? fk : f;
-                    var boyut = e.Graphics!.MeasureString(a, ff, (int)(w * 0.62));
-                    e.Graphics.DrawString(a, ff, Brushes.Black, new RectangleF(x, y, w * 0.62f, boyut.Height));
-                    e.Graphics.DrawString(b, ff, Brushes.Black, new RectangleF(x + w * 0.64f, y, w * 0.36f, boyut.Height));
-                    y += Math.Max(boyut.Height, ff.Height) + 4;
-                }
-            };
+            belge.PrintPage += (_, e) => TeklifSayfaCiz(e.Graphics!, e.MarginBounds, satirlar);
             using var o = new PrintPreviewDialog { Document = belge, Width = 900, Height = 1000 };
             o.ShowDialog(sahip);
         }
