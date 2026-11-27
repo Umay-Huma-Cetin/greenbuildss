@@ -45,6 +45,19 @@ static class Testler
             var uygunsuz = v.Iller.Where(il => KararMotoru.Hesapla(v, new Girdi { Bina = Bina.Dikdortgen(12, 18, 4, 2.9), Il = il, Bolge = il.Ts825Bolge ?? 4, SadeceTs825 = true }).Siralama.Count == 0).Select(il => il.Ad).ToList();
             Dogrula(uygunsuz.Count == 0, "81 ilin hepsinde TS 825'e uyan en az bir paket var", string.Join(", ", uygunsuz));
             {
+                var bugun = new DateTime(2026, 11, 28);
+                var tl = new List<KayitliTeklif>
+                {
+                    new() { Hazirlayan = "a", Sonuc = "Kabul", TeklifTL = 100, Tarih = bugun.AddDays(-40) },
+                    new() { Hazirlayan = "a", Sonuc = "Red", TeklifTL = 50, Tarih = bugun.AddDays(-30) },
+                    new() { Hazirlayan = "a", Sonuc = "Bekliyor", TeklifTL = 70, Tarih = bugun.AddDays(-14) },
+                    new() { Hazirlayan = "b", Sonuc = "Bekliyor", TeklifTL = 20, Tarih = bugun.AddDays(-13) },
+                };
+                var ss = TeklifTakibi.Satiscilar(tl, bugun);
+                Dogrula(ss[0].Hazirlayan == "a" && ss[0].KazanmaOrani == 0.5 && ss[0].KazanilanTL == 100 && ss[0].TakipGereken == 1 && ss[1].TakipGereken == 0 && ss[1].KazanmaOrani == null,
+                        "Teklif takibi: 14 günü geçen bekleyen teklif işaretlenir; satışçı bazında kazanma oranı");
+            }
+            {
                 // İndirim: olasılık artar, marj azalır → beklenen kâr içeride en yüksek
                 var egri = EcoBuildss.Core.Uygulamalar.IndirimAnalizi.Egri(i => (1 / (1 + Math.Exp(-(i * 30 - 1.5))), 118_000 * (1 - i)), 100_000);
                 var en = EcoBuildss.Core.Uygulamalar.IndirimAnalizi.EnIyi(egri)!;
