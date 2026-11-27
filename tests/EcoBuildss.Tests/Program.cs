@@ -44,6 +44,22 @@ static class Testler
             Directory.Delete(gecici, true);
             var uygunsuz = v.Iller.Where(il => KararMotoru.Hesapla(v, new Girdi { Bina = Bina.Dikdortgen(12, 18, 4, 2.9), Il = il, Bolge = il.Ts825Bolge ?? 4, SadeceTs825 = true }).Siralama.Count == 0).Select(il => il.Ad).ToList();
             Dogrula(uygunsuz.Count == 0, "81 ilin hepsinde TS 825'e uyan en az bir paket var", string.Join(", ", uygunsuz));
+            {
+                // PDF: başlık, sayfa sayısı ve çapraz başvuru tablosundaki her konum gerçekten "n 0 obj" ile başlamalı
+                var jpeg = Convert.FromBase64String("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAAQABADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDBooorI+fP/9k=");
+                string pdf = Path.Combine(Path.GetTempPath(), "ecobuildss_test.pdf");
+                PdfYazici.Yaz(pdf, new[] { new PdfSayfa { Jpeg = jpeg, Genislik = 16, Yukseklik = 16 }, new PdfSayfa { Jpeg = jpeg, Genislik = 16, Yukseklik = 16 } }, "Gül Apartmanı teklifi");
+                var bayt = File.ReadAllBytes(pdf); string metin = System.Text.Encoding.Latin1.GetString(bayt);
+                int xref = int.Parse(metin.Substring(metin.LastIndexOf("startxref") + 10).Split('\n')[0]);
+                var girdiler = metin.Substring(xref).Split('\n').Skip(3).TakeWhile(l => l.EndsWith(" n ")).ToList();
+                bool konumlar = girdiler.Select((l, i) => metin.Substring(int.Parse(l.Substring(0, 10)), $"{i + 1} 0 obj".Length) == $"{i + 1} 0 obj").All(x => x);
+                Dogrula(metin.StartsWith("%PDF-1.4") && metin.Contains("/Count 2") && girdiler.Count == 9 && konumlar && metin.TrimEnd().EndsWith("%%EOF"),
+                        "PDF yazıcı: geçerli yapı, iki sayfa, çapraz başvuru konumları doğru");
+                File.Copy(pdf, Path.Combine(Path.GetTempPath(), "ecobuildss_test_kopya.pdf"), true);
+                bool red = false; try { PdfYazici.Yaz(pdf, new[] { new PdfSayfa { Jpeg = new byte[] { 1, 2, 3, 4 }, Genislik = 1, Yukseklik = 1 } }); } catch (ArgumentException) { red = true; }
+                Dogrula(red && File.ReadAllBytes(pdf).Length == bayt.Length, "JPEG olmayan sayfa reddedilir, var olan dosya bozulmaz");
+                File.Delete(pdf);
+            }
             Dogrula(Deprem.UyariVar("2001 öncesi") && !Deprem.UyariVar("Bilinmiyor") && !Deprem.UyariVar("2001–2018") && Deprem.Donemler.All(x => x.Length > 0),
                     "Deprem uyarısı yalnız yapı denetimi öncesi binada");
             {
