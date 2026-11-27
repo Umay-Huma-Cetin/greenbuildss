@@ -75,6 +75,9 @@ static class Testler
                 var r4 = KararMotoru.Hesapla(v, new Girdi { Bina = Bina.Dikdortgen(12, 18, 4, 2.9), Il = v.VarsayilanIl, Bolge = 4 });
                 var r2 = KararMotoru.Hesapla(v, new Girdi { Bina = Bina.Dikdortgen(12, 18, 2, 2.9), Il = v.VarsayilanIl, Bolge = 4 });
                 double b4 = KararMotoru.BariyerAlani(v, r4);
+                var rb = KararMotoru.Hesapla(v, new Girdi { Bina = Bina.Dikdortgen(12, 18, 4, 2.9), Il = v.VarsayilanIl, Bolge = 4, PencereEn = 2.0, PencereBoy = 1.5 });
+                double birPencere = 2 * 0.15 * 1.5 + 0.30 * (2.0 + 0.30);   // bir pencerede bariyer alanı
+                Dogrula(Math.Abs(KararMotoru.BariyerAlani(v, rb) - rb.CamAlani / 3.0 * birPencere) < 1e-6, "Girilen pencere ölçüsüyle bariyer alanı hesaplanır");
                 Dogrula(KararMotoru.BariyerAlani(v, r2) == 0 && Math.Abs(b4 - r4.CamAlani * 0.5) < 1e-6,
                         "Pencere yangın bariyeri: 6,5 m altı yok; üstünde 120×150 pencerede pencere alanının yarısı kadar", $"{b4:0.0} m², cam {r4.CamAlani:0.0} m²");
             }

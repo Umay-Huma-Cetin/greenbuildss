@@ -11,6 +11,7 @@ namespace EcoBuildss.Core
         public Il? Il;                   // proje ili (MGM derece-gün); boşsa parametreler.csv K1 (Malatya)
         public int Bolge = 4;            // TS 825:2024 iklim bölgesi (U sınırları); Malatya = 4
         public double CamOrani = 0.20;   // pencere alanı / brüt dış duvar alanı (0 … 0,9)
+        public double? PencereEn, PencereBoy;   // tipik pencere ölçüsü (m); boşsa parametreler.csv B6 × B7 (yangın bariyeri hesabı)
         public double? MevcutDuvarU;     // yenileme: mevcut duvarın U değeri (W/m²K); boşsa parametreler.csv M1
         public double Kalibrasyon = 1;   // gerçek tüketim kayıtlarıyla bulunan düzeltme katsayısı (1 = kalibre edilmemiş model)
         public string Dograma = VarsayilanDograma;   // pencere doğrama tipi (TS 825:2024 Ek A.3 çizelgesindeki adıyla)
@@ -62,6 +63,7 @@ namespace EcoBuildss.Core
         public bool PencereDegisir = true, CatiYalitimi = true, ZeminYalitimi = true;   // işin kapsamı
         public double MevcutGiderTL, MevcutIsitmaKWh, MevcutCO2Kg;   // yenilemede yalıtımsız mevcut binanın yıllık gideri, ısıtması, analiz süresince CO₂'si
         public double BinaYuksekligi;
+        public double PencereEn, PencereBoy;   // yangın bariyeri hesabındaki pencere ölçüsü (m)
         public int YanginElenen;
         public double YanginSeridiM2;          // zor alevlenici sistemde zeminden 1,5 m hiç yanmaz şerit alanı               // yangın yönetmeliği nedeniyle çıkarılan birleşim sayısı
         public string IlAdi = "Malatya";
@@ -135,6 +137,8 @@ namespace EcoBuildss.Core
             else throw new InvalidDataException($"ts825_bolgeler.csv içinde {g.Bolge}. bölge yok.");
             r.Dograma = g.Dograma;
             r.BinaYuksekligi = g.Bina.Yukseklik;
+            if (g.PencereEn is <= 0 || g.PencereBoy is <= 0) throw new ArgumentException("Pencere ölçüsü sıfırdan büyük olmalı.");
+            r.PencereEn = g.PencereEn ?? v.P("B6"); r.PencereBoy = g.PencereBoy ?? v.P("B7");
             foreach (var c in v.Malzemeler.Where(m => m.Tur == 'P'))
                 if (v.PencereU(g.Dograma, c) is double up) r.PencereU[c.Id] = up;
             if (r.PencereU.Count == 0) throw new InvalidDataException($"ts825_pencere.csv içinde \"{g.Dograma}\" doğraması için cam değeri yok.");
@@ -304,7 +308,7 @@ namespace EcoBuildss.Core
         public static double BariyerAlani(VeriDeposu v, Sonuc r)
         {
             if (r.BinaYuksekligi <= v.P("B3") || r.CamAlani <= 0) return 0;
-            double w = v.P("B6"), h = v.P("B7"), n = r.CamAlani / (w * h);
+            double w = r.PencereEn > 0 ? r.PencereEn : v.P("B6"), h = r.PencereBoy > 0 ? r.PencereBoy : v.P("B7"), n = r.CamAlani / (w * h);
             return n * (2 * v.P("B4") * h + v.P("B5") * (w + 2 * v.P("B4")));
         }
 
