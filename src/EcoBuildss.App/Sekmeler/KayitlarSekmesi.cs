@@ -13,6 +13,12 @@ namespace EcoBuildss.UI
         readonly Label ozet = new() { AutoSize = true, Font = Ui.Kucuk, ForeColor = Ui.Soluk, Margin = new Padding(12, 11, 0, 0) };
         readonly Label[] kpi = Enumerable.Range(0, 4).Select(_ => new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 18f), ForeColor = Ui.Koyu }).ToArray();
         readonly Label[] kpiAlt = Enumerable.Range(0, 4).Select(_ => new Label { AutoSize = true, Font = Ui.Kucuk, ForeColor = Ui.Soluk }).ToArray();
+        void Ac(KayitliTeklif t)
+        {
+            try { TeklifeYukle?.Invoke(d.Db!.TeklifAc(t.Id)); }
+            catch (UnauthorizedAccessException e) { Ui.Hata(this, e.Message); }
+        }
+
         public event Action<KayitliTeklif>? TeklifeYukle;
         readonly Button silDugmesi;
 
@@ -26,7 +32,7 @@ namespace EcoBuildss.UI
             ust.Controls.Add(Ui.Dugme("Kabul", (_, __) => Isaretle("Kabul"), true));
             ust.Controls.Add(Ui.Dugme("Red", (_, __) => Isaretle("Red")));
             ust.Controls.Add(Ui.Dugme("Bekliyor", (_, __) => Isaretle("Bekliyor")));
-            ust.Controls.Add(Ui.Dugme("Aç", (_, __) => { if (Secili() is KayitliTeklif t) TeklifeYukle?.Invoke(t); }));
+            ust.Controls.Add(Ui.Dugme("Aç", (_, __) => { if (Secili() is KayitliTeklif t) Ac(t); }));
             silDugmesi = Ui.Dugme("Sil", (_, __) => Sil());
             ust.Controls.Add(silDugmesi);
             ust.Controls.Add(ozet);
@@ -42,7 +48,7 @@ namespace EcoBuildss.UI
             var baslik = new Label { Text = "Tekliflerim", Dock = DockStyle.Top, Height = 40, Font = new Font("Segoe UI Semibold", 14f), ForeColor = Ui.Koyu, Padding = new Padding(12, 8, 0, 0) };
             Controls.Add(Ui.Kart("Teklifler", liste));
             Controls.Add(ust); Controls.Add(bant); Controls.Add(baslik);
-            liste.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0 && Secili() is KayitliTeklif t) TeklifeYukle?.Invoke(t); };
+            liste.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0 && Secili() is KayitliTeklif t) Ac(t); };
             d.TekliflerDegisti += Doldur;
             Load += (_, __) => Doldur();
         }

@@ -29,7 +29,7 @@ Geliştiren: **Umay Hüma Çetin**
 
 **Kullanıcılar ve roller**
 - Program oturum açılmadan açılmaz. İlk çalıştırmada firmanın yönetici hesabı oluşturulur; diğer kullanıcıları yönetici ekler.
-- **Yönetici** her şeyi yapar. **Satış** teklif hazırlar, kaydeder ve sonucunu işaretler. Satış rolü teklif silemez, veri yükleyemez, kullanıcı ve ayar değiştiremez.
+- **Yönetici** her şeyi yapar. **Satış** teklif hazırlar, kaydeder ve sonucunu işaretler; yalnız **kendi** tekliflerini görür, açar ve işaretler. Satış rolü teklif silemez, veri yükleyemez, kullanıcı ve ayar değiştiremez.
 - Yetki yalnız arayüzde değil, veritabanı katmanında da denetlenir. Yetkisiz istek reddedilir ve günlüğe yazılır.
 - Sistemde en az bir etkin yönetici kalması zorunludur.
 
@@ -59,6 +59,8 @@ Geliştiren: **Umay Hüma Çetin**
   - yedek alma ve geri yükleme
   - hatalar
 - Her kayıt bir öncekinin SHA-256 özetini içerir. Kayıtlar böylece zincirlenir: biri sonradan değiştirilir ya da silinirse denetim bunu bulur.
+- Zincir tek başına anahtarsızdır; dosyaya erişen biri zinciri baştan hesaplayabilir ya da son kayıtları silebilir. Bunun için oturum açıkken son kayıt, veri anahtarından türetilen anahtarla HMAC-SHA256 ile **mühürlenir**. Girişte ve **Denetle**'de mühür doğrulanır; bozulma kalıcı olarak işaretlenir ve günlüğe Güvenlik kaydı düşer.
+- Teklifin açılması da (kim, hangi teklif) günlüğe yazılır.
 - Günlük **Veri ve modeller → Günlük** sekmesinden okunur: seviyeye göre süzülür, metinle aranır, **Denetle** zinciri baştan doğrular.
 - Veritabanına yazılamayan hatalar ayrıca `%AppData%\EcoBuildss\hata.log` dosyasına yazılır.
 
@@ -133,7 +135,7 @@ dotnet run --project tests/EcoBuildss.Tests
 python araclar/dogrulama/bagimsiz_dogrulama.py <klasör>   # isteğe bağlı: pandas, scikit-learn
 ```
 
-106 test vardır ve şunları kapsar:
+112 test vardır ve şunları kapsar:
 - metrikler (F1, AUC, CV(RMSE))
 - regresyon ve gerçek levha fiyatları
 - enerji motoru ve yangın yönetmeliği kuralı
@@ -144,7 +146,7 @@ python araclar/dogrulama/bagimsiz_dogrulama.py <klasör>   # isteğe bağlı: pa
 - az veride ve sinyalsiz veride kalite eşiğinin modeli reddetmesi
 - apartman hesabı (kapsam, faturadan tasarruf, taksit)
 - SQLite kaydı (parametreli sorgu)
-- güvenlik: parola özeti, kilitleme, roller, geçici parola, alan şifreleme ve değiştirilmiş şifreli değerin yakalanması, kurtarma anahtarı ve yenilenmesi, teklif ayrıntılarının diskte şifreli olması, fiyat güncelleme ve geri alma, günlük zinciri ve değişiklik tespiti, yedek ve geri yükleme
+- güvenlik: parola özeti, kilitleme, roller, geçici parola, alan şifreleme ve değiştirilmiş şifreli değerin yakalanması, kurtarma anahtarı ve yenilenmesi, Satış rolünün başkasının teklifine erişememesi, günlük mühürü (baştan yazılan ve sondan silinen günlüğün yakalanması), teklif ayrıntılarının diskte şifreli olması, fiyat güncelleme ve geri alma, günlük zinciri ve değişiklik tespiti, yedek ve geri yükleme
 
 ## Klasörler
 

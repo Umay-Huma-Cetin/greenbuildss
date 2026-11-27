@@ -287,7 +287,11 @@ static class Testler
                 db.ParolaDegistir("Satis2026!", "Kendi2026x"); db.OturumKapat();
                 Dogrula(db.GirisYap("mehmet", "Kendi2026x") == GirisSonucu.Basarili && !db.Aktif!.ParolaDegismeli, "Parola değişince zorunluluk kalkar");
                 bool yasak = false; try { db.TeklifSil(t.Id); } catch (UnauthorizedAccessException) { yasak = true; }
-                Dogrula(yasak && db.Teklifler().Count == 1, "Satış rolü teklif silemez");
+                Dogrula(yasak, "Satış rolü teklif silemez");
+                Dogrula(db.Teklifler().Count == 0, "Satış rolü başkasının teklifini görmez");
+                yasak = false; try { db.SonucIsaretle(t.Id, "Kabul"); } catch (UnauthorizedAccessException) { yasak = true; }
+                bool acamaz = false; try { db.TeklifAc(t.Id); } catch (UnauthorizedAccessException) { acamaz = true; }
+                Dogrula(yasak && acamaz, "Satış rolü başkasının teklifini açamaz ve işaretleyemez");
                 yasak = false; try { db.KullaniciEkle("x123", "X", Rol.Yonetici, "Parola123"); } catch (UnauthorizedAccessException) { yasak = true; }
                 Dogrula(yasak, "Satış rolü kullanıcı ekleyemez");
                 db.OturumKapat();
@@ -359,6 +363,43 @@ static class Testler
                 db.OturumKapat();
                 Dogrula(db.GirisYap("umay", "Gizli2026!") == GirisSonucu.HataliBilgi, "Eski parola artık geçmez");
             }
+            // Zincir anahtarsızdır; mühür, zincirin baştan yazılmasını ve son kayıtların silinmesini yakalar
+            using (var db = new Veritabani(dosya))
+            {
+                db.GirisYap("umay", "Yeni2026xx");
+                Dogrula(db.GunlukDogrula().sorun == null && db.TeklifAc(db.Teklifler()[0].Id) != null && db.GunlukOku().Any(g => g.Islem == "Teklif açıldı"),
+                        "Teklif açma günlüğe yazılır; sağlam günlükte sorun yok");
+            }
+            string kopya = dosya + ".kopya";
+            File.Copy(dosya, kopya, true);
+            using (var ham = new SqliteBaglanti(dosya)) ham.Yaz("DELETE FROM islem_gunlugu WHERE id > (SELECT MAX(id) - 3 FROM islem_gunlugu)");
+            using (var db = new Veritabani(dosya))
+            {
+                Dogrula(db.GunlukDogrula().sorun == null, "Sondan silme anahtarsız zincirde görünmez (mühürsüz denetim)");
+                db.GirisYap("umay", "Yeni2026xx");
+                var (_, s1) = db.GunlukDogrula();
+                Dogrula(s1 != null && s1.Contains("silinmiş"), "Sondan silinen günlük kayıtları mühürle yakalanır", s1 ?? "bulunamadı");
+            }
+            // Bütün zinciri SHA-256 ile baştan yeniden hesaplayan saldırı
+            using (var ham = new SqliteBaglanti(kopya))
+            {
+                ham.Yaz("UPDATE islem_gunlugu SET islem = 'değiştirildi' WHERE id = 2");
+                string onceki = "";
+                foreach (var r in ham.Sorgu("SELECT id, tarih, kullanici, seviye, islem, ayrinti FROM islem_gunlugu ORDER BY id"))
+                {
+                    using var h = System.Security.Cryptography.SHA256.Create();
+                    var oz = BitConverter.ToString(h.ComputeHash(System.Text.Encoding.UTF8.GetBytes(string.Join("\u001f", onceki, ((long)r["id"]!).ToString(), (string)r["tarih"]!, (string)r["kullanici"]!, (string)r["seviye"]!, (string)r["islem"]!, (string)r["ayrinti"]!)))).Replace("-", "").ToLowerInvariant();
+                    ham.Yaz("UPDATE islem_gunlugu SET ozet = @o WHERE id = @i", new Dictionary<string, object?> { ["o"] = oz, ["i"] = r["id"] });
+                    onceki = oz;
+                }
+            }
+            using (var db = new Veritabani(kopya))
+            {
+                db.GirisYap("umay", "Yeni2026xx");
+                var (_, s2) = db.GunlukDogrula();
+                Dogrula(s2 != null && s2.Contains("baştan"), "Baştan yeniden hesaplanan günlük zinciri mühürle yakalanır", s2 ?? "bulunamadı");
+            }
+            File.Delete(kopya);
             // Günlük sonradan değiştirilirse zincir bozulur
             using (var ham = new SqliteBaglanti(dosya)) ham.Yaz("UPDATE islem_gunlugu SET ayrinti = 'değiştirildi' WHERE id = 3");
             using (var db = new Veritabani(dosya))
