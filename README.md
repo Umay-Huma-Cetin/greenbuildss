@@ -92,6 +92,8 @@ Gerekenler: Windows 10/11 ve Visual Studio 2022 (.NET 8, “.NET masaüstü geli
 2. **F5** tuşuna basın. Başlangıç projesi `EcoBuildss.App`'tir.
 3. İlk açılışta yönetici hesabınızı oluşturun.
 
+**Kurulum dosyası (setup.exe):** `kurulum\yayinla.cmd` dosyasına çift tıklayın. Sırasıyla testleri çalıştırır, programı kendi .NET'iyle tek `EcoBuildss.exe` olarak `kurulum\cikti` klasörüne yayınlar ve [Inno Setup 6.3+](https://jrsoftware.org/isdl.php) kuruluysa `kurulum\kurulum_cikti\EcoBuildss-Kurulum-3.0.0.exe` dosyasını üretir. Bu dosya .NET kurulu olmayan bilgisayara da kurulur; Başlat menüsü ve masaüstü kısayolu ekler. Kaldırınca firma verisi (`%AppData%\EcoBuildss`) silinmez. Yayın için ilk seferde internet gerekir (.NET çalışma zamanı paketleri indirilir).
+
 Hiçbir NuGet paketi gerekmez. SQLite'a Windows'un kendi `winsqlite3.dll` dosyasıyla bağlanılır. `nuget.config` paket kaynaklarını kapatır, bu yüzden proje internetsiz de derlenir. Veritabanı `%AppData%\EcoBuildss\ecobuildss.db` dosyasıdır.
 
 ## Gerçek veriyle kullanım

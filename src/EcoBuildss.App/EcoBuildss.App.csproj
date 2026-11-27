@@ -19,8 +19,8 @@
     <ProjectReference Include="..\EcoBuildss.Core\EcoBuildss.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Kaynak gösterimli referans veri ve örnek (sentetik) veri programın yanına kopyalanır -->
-    <None Include="..\..\veri\referans\*.csv" Link="veri\referans\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\..\veri\referans\BUTUNLUK.sha256" Link="veri\referans\BUTUNLUK.sha256" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Kaynak gösterimli referans veri programın yanına kopyalanır (yayında da) -->
+    <None Include="..\..\veri\referans\*.csv" Link="veri\referans\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="..\..\veri\referans\BUTUNLUK.sha256" Link="veri\referans\BUTUNLUK.sha256" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 </Project>

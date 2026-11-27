@@ -14,3 +14,7 @@ obj/
 *.db
 *.db-wal
 *.db-shm
+
+# Kurulum çıktıları
+kurulum/cikti/
+kurulum/kurulum_cikti/
