@@ -1,20 +1,29 @@
 # EcoBuildss
 
-Yeşil bina malzeme seçimi için karar destek sistemi. Bir yalıtım/inşaat firmasının teklif mühendisi; ili, binanın ölçülerini ve müşterinin önceliğini girer. Sistem 60 malzeme paketini (10 mantolama × 2 pencere camı × 3 duvar) hesaplar, TS 825 ve yangın yönetmeliğine uymayanları eler ve üç paket önerir. Firma kendi faturalarını ve teklif geçmişini yükledikçe enerji tahminini gerçek tüketime göre düzeltir ve teklifin kabul edilme olasılığını öğrenir.
+Yalıtım ve inşaat firmaları için karar destek sistemi. Üç gerçek işi çözer:
+
+1. **Apartman mantolaması.** Bu işler kat malikleri toplantısında kazanılır ya da kaybedilir. Toplantıda herkes aynı üç şeyi sorar: daire başına ne ödeyeceğim, faturam ne kadar düşecek, kaç yılda döner. Sahada 10 dakikada bu üç sorunun cevabı ve toplantıda dağıtılacak tek sayfa çıkar. Bir dairenin gerçek doğal gaz faturası girilirse tasarruf o faturadan hesaplanır.
+2. **Yeni bina.** Ruhsattan önce TS 825 ve yangın yönetmeliğine uyan duvar–yalıtım–cam paketlerinden en uygun maliyetlisi; keşif, teklif ve Excel çıktısıyla.
+3. **Tekliflerim.** Verilen tekliflerin takibi: bekleyen işler, kazanma oranı, kazanılan iş. Sonuçlar işaretlendikçe sistem firmanın kendi verisinden kazanma olasılığını öğrenir.
 
 Geliştiren: **Umay Hüma Çetin**
 
-![Teklif ekranı](docs/ekran/01_teklif.png)
+![Apartman mantolaması](docs/ekran/02_apartman_mantolamasi.png)
 
-## Ne yapar?
+## Ekranlar
 
-| Ekran | Kullanıcıya sağladığı | Yöntem |
+| Ekran | Kullanıcıya sağladığı | Arkadaki yöntem |
 |---|---|---|
-| **Teklif** | İl ve bina girilir; ekonomik, önerilen ve yüksek performans paketleri, keşif, teklif tutarı, geri ödeme ve kabul olasılığı. Excel ve yazdır/PDF. | TS 825 derece-gün enerji modeli, ömür boyu maliyet, AHP + TOPSIS, kural tabanı |
-| **Analiz** | Ekonomik yalıtım kalınlığı, bütçeye sığan en iyi paket, fiyatlar değişirse önerinin değişip değişmediği, fiyat riskine göre maliyet aralığı | Altın oran araması, fiyat regresyonu, Pareto, duyarlılık, Monte Carlo |
-| **Veri** | Firmanın kendi CSV dosyalarını içeri alır. Her satır denetlenir; hatalı satır alınmaz ve nedeni yazılır. | Şema denetimi |
-| **Modeller** | Enerji modelinin gerçek tüketimle kalibrasyonu, teklif kabul tahmini, il ve müşteri segmentleri | Çoklu doğrusal regresyon, lojistik regresyon / karar ağacı / rastgele orman, k-ortalamalar++ |
-| **Kayıtlı teklifler** | Teklifler SQLite'ta saklanır. Sonuç (Kabul/Red) işaretlendikçe model firmanın kendi sonuçlarından öğrenir. | Veritabanı, sürekli öğrenme |
+| **Ana sayfa** | Üç işten birini seçme, bekleyen teklif sayısı | — |
+| **Apartman mantolaması** | Daire başına tutar (KDV dahil), taksit, ısıtma faturasındaki düşüş, geri ödeme süresi, toplantı sayfası (yazdır / PDF) | TS 825 derece-gün modeli, gerçek faturadan tasarruf, iskontolu geri ödeme, anüite, Kat Mülkiyeti Kanunu md. 42 |
+| **Yeni bina** | Üç paket, bina çizimi ve ölçekli duvar kesiti, malzemeleri tek tek değiştirme, keşif ve teklif, ayrıntılı analiz | AHP + TOPSIS, ömür boyu maliyet, kural tabanı (TS 825, yangın yönetmeliği md. 27), optimizasyon, Monte Carlo |
+| **Tekliflerim** | Bekleyen / kazanılan işler, kazanma oranı, her teklifin kazanma olasılığı | Sınıflandırma (kalite eşiğini geçerse) |
+| **Veri ve modeller** | Firma bilgileri, gerçek veri yükleme, modellerin doğrulaması | Regresyon (kalibrasyon), sınıflandırma, kümeleme |
+
+| | |
+|---|---|
+| ![Ana sayfa](docs/ekran/01_ana_sayfa.png) | ![Toplantı sayfası](docs/ekran/03_toplanti_sayfasi.png) |
+| ![Yeni bina](docs/ekran/04_yeni_bina.png) | ![Tekliflerim](docs/ekran/05_tekliflerim.png) |
 
 ## Kurulum
 
@@ -29,10 +38,10 @@ Hiçbir NuGet paketi gerekmez. SQLite'a Windows'un kendi `winsqlite3.dll` dosyas
 
 İlk açılışta veri yoktur. Teklif ekranı yine çalışır; enerji TS 825 modeliyle hesaplanır, kabul tahmini kapalıdır.
 
-1. **Veri → Boş şablon kaydet.** Tüketim kayıtları (faturalar) ve teklif geçmişi (CRM) için şablonu alın. Sütunlar [docs/VERI_SOZLUGU.md](docs/VERI_SOZLUGU.md) dosyasında açıklanmıştır.
+1. **Veri ve modeller → Veri yükleme → Boş şablon kaydet.** Tüketim kayıtları (faturalar) ve teklif geçmişi (CRM) için şablonu alın. Sütunlar [docs/VERI_SOZLUGU.md](docs/VERI_SOZLUGU.md) dosyasında açıklanmıştır.
 2. Şablonu Excel'de doldurup CSV olarak kaydedin. Türkçe Excel'in `;` ayırıcısı ve `1.234,5` sayı biçimi de okunur.
-3. **Veri → Kendi dosyamı içe aktar.** Denetim raporu her hatalı satırın satır numarasını, sütununu ve nedenini gösterir. Gerçek veri yüklenince örnek veri silinir, ikisi karışmaz.
-4. **Modeller** sekmesinde sonuçlara bakın. Bir model ancak kalite eşiğini geçerse teklif ekranında kullanılır:
+3. **Kendi dosyamı içe aktar.** Denetim raporu her hatalı satırın satır numarasını, sütununu ve nedenini gösterir. Gerçek veri yüklenince örnek veri silinir, ikisi karışmaz.
+4. **Modeller ve doğrulama** sekmesinde sonuçlara bakın. Bir model ancak kalite eşiğini geçerse teklif ekranında kullanılır:
    - **Kalibrasyon:** en az 20 kayıt gerekir. Görülmemiş kayıtlarda (5 katlı çapraz doğrulama) hatayı düşürmüyorsa uygulanmaz.
    - **Kabul tahmini:** en az 100 teklif ve her sonuçtan en az 20 kayıt gerekir. Modelin seçimde hiç kullanılmamış %25'lik test kümesinde şu üç koşulu sağlaması gerekir:
      - F1 ≥ 0,87
@@ -40,9 +49,9 @@ Hiçbir NuGet paketi gerekmez. SQLite'a Windows'un kendi `winsqlite3.dll` dosyas
      - "her teklife kabul de" tahmininden belirgin iyi olmak
 
      Sağlamazsa teklif ekranında **gösterilmez**.
-5. Uygulamada verilen her teklifi kaydedin, sonucu belli olunca **Kayıtlı teklifler** sekmesinde Kabul/Red işaretleyin. Model bu kayıtlarla kendini yeniden kurar.
+5. Uygulamada verilen her teklifi kaydedin, sonucu belli olunca **Tekliflerim** ekranında Kabul/Red işaretleyin. Model bu kayıtlarla kendini yeniden kurar.
 
-Gerçek veri yokken denemek için **Veri → Örnek (sentetik) veriyi yükle** düğmesi vardır. Örnek veri kullanıldığı sürece üst bantta uyarı görünür.
+Gerçek veri yokken denemek için **Veri yükleme → Örnek (sentetik) veriyi yükle** düğmesi vardır. Örnek veri kullanıldığı sürece sol altta uyarı görünür.
 
 ## Modeller ve doğrulama
 
@@ -69,13 +78,14 @@ python araclar/dogrulama/bagimsiz_dogrulama.py          # isteğe bağlı: panda
 python araclar/dogrulama/bagimsiz_dogrulama.py <klasör> # kendi gerçek veriniz için
 ```
 
-46 test vardır ve şunları kapsar:
+55 test vardır ve şunları kapsar:
 - metrikler (F1, AUC, CV(RMSE))
 - regresyon ve gerçek levha fiyatları
 - enerji motoru ve yangın yönetmeliği kuralı
 - hatalı CSV satırlarının reddi
 - uçtan uca örnek veri akışı
 - az veride ve sinyalsiz veride kalite eşiğinin modeli reddetmesi
+- apartman hesabı (kapsam, faturadan tasarruf, taksit)
 - SQLite kaydı (parametreli sorgu)
 
 ## Klasörler

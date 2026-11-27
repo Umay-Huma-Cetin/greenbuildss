@@ -78,6 +78,24 @@ static class Testler
             Dogrula(hata, "Geçersiz pencere oranı reddedilir");
         }
 
+        Bolum("Apartman mantolaması");
+        {
+            var g = new Girdi { Bina = Bina.Dikdortgen(16, 22, 6, 2.9), Il = v.VarsayilanIl, Bolge = 4, Mevcut = true, PencereDegisir = false, CatiYalitimi = true, ZeminYalitimi = false };
+            var r = KararMotoru.Hesapla(v, g);
+            Dogrula(r.Tum.Select(x => x.Cam.Id).Distinct().Count() == 1, "Pencereler değişmezse cam seçeneği çoğaltılmaz");
+            var s = r.Tum.First(x => x.Yalitim.Id == "Y3");
+            double beklenen = r.OpakDuvar * s.Yalitim.FiyatM2 + s.YanginEkMaliyet + r.Cati.FiyatM2 * r.CatiAlani;
+            Yakin(s.IlkYatirim, beklenen, 1e-6, "Maliyet = mantolama + yangın şeridi + çatı (pencere ve zemin yok)");
+            Yakin(s.PencereU, v.P("M4"), 1e-12, "Mevcut pencere U değeri kullanılır");
+            var a = Apartman.Hesapla(v, r, s, 24, 0.18, 0, 30000, 900, 12, 0.03);
+            Yakin(a.FaturaOnce, 30000 - 12 * 900, 1e-9, "Isıtma faturası = yıllık − 12 × yaz faturası");
+            Yakin(a.YillikTasarruf, a.FaturaOnce * (1 - s.H / r.HBaz), 1e-9, "Tasarruf = ısıtma faturası × azalma oranı");
+            Yakin(a.AylikTaksit, Apartman.Taksit(a.DaireBasiTL, 12, 0.03), 1e-9, "Taksit (anüite)");
+            Yakin(Apartman.Taksit(1200, 12, 0), 100, 1e-12, "Vade farksız taksit");
+            Yakin(Apartman.Taksit(1000, 12, 0.01), 88.8487886783417, 1e-6, "Anüite formülü (1.000 TL, 12 ay, %1)");
+            Dogrula(a.GeriOdemeYil > 0, "Daire başına geri ödeme hesaplanır");
+        }
+
         Bolum("İçe aktarma ve veri denetimi");
         {
             var sema = Semalar.Teklif(v);

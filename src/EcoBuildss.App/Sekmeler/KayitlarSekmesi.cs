@@ -10,7 +10,9 @@ namespace EcoBuildss.UI
     {
         readonly Durum d;
         readonly DataGridView liste = Ui.Izgara();
-        readonly Label ozet = new() { AutoSize = true, Font = Ui.Kalin, Margin = new Padding(12, 9, 0, 0) };
+        readonly Label ozet = new() { AutoSize = true, Font = Ui.Kucuk, ForeColor = Ui.Soluk, Margin = new Padding(12, 11, 0, 0) };
+        readonly Label[] kpi = Enumerable.Range(0, 4).Select(_ => new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 18f), ForeColor = Ui.Koyu }).ToArray();
+        readonly Label[] kpiAlt = Enumerable.Range(0, 4).Select(_ => new Label { AutoSize = true, Font = Ui.Kucuk, ForeColor = Ui.Soluk }).ToArray();
         public event Action<KayitliTeklif>? TeklifeYukle;
 
         public KayitlarSekmesi(Durum durum)
@@ -23,8 +25,18 @@ namespace EcoBuildss.UI
             ust.Controls.Add(Ui.Dugme("Teklif ekranında aç", (_, __) => { if (Secili() is KayitliTeklif t) TeklifeYukle?.Invoke(t); }));
             ust.Controls.Add(Ui.Dugme("Sil", (_, __) => Sil()));
             ust.Controls.Add(ozet);
-            Controls.Add(Ui.Kart("Kayıtlı teklifler", liste, "Sonucu belli olan teklifleri işaretleyin: kabul tahmini modeli bu kayıtlardan öğrenir"));
-            Controls.Add(ust);
+            var bant = new TableLayoutPanel { Dock = DockStyle.Top, Height = 92, ColumnCount = 4, BackColor = Color.White, Padding = new Padding(16, 10, 10, 6) };
+            string[] bas = { "BEKLEYEN TEKLİF", "KAZANMA ORANI", "KAZANILAN İŞ (KDV HARİÇ)", "SON 30 GÜN" };
+            for (int i = 0; i < 4; i++)
+            {
+                bant.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+                var p = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false };
+                p.Controls.Add(new Label { Text = bas[i], AutoSize = true, Font = new Font("Segoe UI", 8f, FontStyle.Bold), ForeColor = Ui.Yesil });
+                p.Controls.Add(kpi[i]); p.Controls.Add(kpiAlt[i]); bant.Controls.Add(p, i, 0);
+            }
+            var baslik = new Label { Text = "Tekliflerim", Dock = DockStyle.Top, Height = 40, Font = new Font("Segoe UI Semibold", 14f), ForeColor = Ui.Koyu, Padding = new Padding(12, 8, 0, 0) };
+            Controls.Add(Ui.Kart("Teklifler", liste, "Toplantı ya da görüşme sonucunu işaretleyin; kazanma olasılığı tahmini bu sonuçlardan öğrenir"));
+            Controls.Add(ust); Controls.Add(bant); Controls.Add(baslik);
             liste.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0 && Secili() is KayitliTeklif t) TeklifeYukle?.Invoke(t); };
             d.TekliflerDegisti += Doldur;
             Load += (_, __) => Doldur();
@@ -36,13 +48,13 @@ namespace EcoBuildss.UI
         {
             liste.Columns.Clear(); liste.Rows.Clear();
             if (d.Db == null) { ozet.Text = "Veritabanı açılamadı: " + d.DbHatasi; return; }
-            foreach (var c in new[] { "Teklif no", "Tarih", "Müşteri", "Tip", "İl", "Proje", "Alan (m²)", "Paket", "Teklif (KDV hariç)", "TL/m²", "Geri ödeme", "Tahmini kabul", "Sonuç" }) liste.Columns.Add(c, c);
+            foreach (var c in new[] { "Teklif no", "Tarih", "Müşteri / apartman", "Tip", "İl", "İş", "Alan (m²)", "Paket", "Teklif (KDV hariç)", "TL/m²", "Geri ödeme", "Kazanma olasılığı", "Sonuç" }) liste.Columns.Add(c, c);
             var l = d.Db.Teklifler();
             foreach (var t in l)
             {
-                int i = liste.Rows.Add(t.TeklifNo, t.Tarih.ToString("dd.MM.yyyy"), t.Musteri, t.MusteriTipi, t.Il, t.ProjeTuru, Ui.Sayi(t.KullanimAlani), t.Paket, Ui.Tl(t.TeklifTL),
+                int i = liste.Rows.Add(t.TeklifNo, t.Tarih.ToString("dd.MM.yyyy"), t.Musteri, t.MusteriTipi, t.Il, t.ProjeTuru == "Yenileme" ? (t.DaireSayisi > 0 ? $"Mantolama · {t.DaireSayisi} daire" : "Mantolama") : "Yeni bina", Ui.Sayi(t.KullanimAlani), t.Paket, Ui.Tl(t.TeklifTL),
                                        Ui.Sayi(t.TeklifTLm2), t.GeriOdemeYil.HasValue ? Ui.Sayi(t.GeriOdemeYil.Value, "0.0") + " yıl" : "—",
-                                       t.KabulOlasiligi.HasValue ? Ui.Yuzde(t.KabulOlasiligi.Value, "0") : "—", t.Sonuc);
+                                       t.KabulOlasiligi.HasValue ? Ui.Olasilik(t.KabulOlasiligi.Value) : "—", t.Sonuc);
                 liste.Rows[i].Tag = t;
                 liste.Rows[i].Cells[12].Style.ForeColor = t.Sonuc == "Kabul" ? Ui.Yesil : t.Sonuc == "Red" ? Ui.Kirmizi : Ui.Soluk;
             }
@@ -50,6 +62,11 @@ namespace EcoBuildss.UI
             var tahminli = l.Where(t => t.Sonuc != "Bekliyor" && t.KabulOlasiligi.HasValue).ToList();
             string isabet = tahminli.Count == 0 ? "" : $" · tahmin isabeti %{100.0 * tahminli.Count(t => (t.KabulOlasiligi >= (d.Kabul?.Esik ?? 0.5)) == (t.Sonuc == "Kabul")) / tahminli.Count:0} ({tahminli.Count} teklif)";
             ozet.Text = $"{l.Count} teklif · {kabul} kabul · {red} red · {l.Count - kabul - red} bekliyor{isabet}";
+            var bek = l.Where(t => t.Sonuc == "Bekliyor").ToList(); var son = l.Where(t => t.Tarih >= DateTime.Today.AddDays(-30)).ToList();
+            kpi[0].Text = bek.Count.ToString(); kpiAlt[0].Text = bek.Count == 0 ? "takip edilecek teklif yok" : $"toplam {Ui.Tl(bek.Sum(t => t.TeklifTL))}";
+            kpi[1].Text = kabul + red == 0 ? "—" : Ui.Yuzde((double)kabul / (kabul + red), "0"); kpiAlt[1].Text = $"{kabul} kabul / {red} red";
+            kpi[2].Text = Ui.Tl(l.Where(t => t.Sonuc == "Kabul").Sum(t => t.TeklifTL)); kpiAlt[2].Text = "kabul edilen tekliflerin toplamı";
+            kpi[3].Text = son.Count.ToString(); kpiAlt[3].Text = $"teklif · {Ui.Tl(son.Sum(t => t.TeklifTL))}";
         }
 
         void Isaretle(string sonuc)

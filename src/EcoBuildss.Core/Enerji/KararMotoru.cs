@@ -19,6 +19,8 @@ namespace EcoBuildss.Core
         public int Kademe = 1;           // 1 / 2: doğalgaz ve elektrik tarifesinin kademesi
         public bool Sogutma = false;     // klima ile soğutma var: soğutma derece-günüyle elektrik gideri eklenir
         public bool Mevcut = false;      // mevcut bina (yenileme): duvar yerinde kalır, yalıtım dışarıdan eklenir
+        // Yenilemenin kapsamı (yalnız Mevcut = true iken): apartman mantolamasında pencereler çoğu zaman bağımsız bölümdür, işe dahil edilmez
+        public bool PencereDegisir = true, CatiYalitimi = true, ZeminYalitimi = true;
         public double EnerjiArtisi = 0;  // enerji fiyatlarının enflasyonun üstündeki yıllık reel artışı (0 = enflasyonla aynı)
         public int Yil = 20;             // analiz süresi (yıl)
         public bool SadeceTs825 = false;
@@ -39,6 +41,7 @@ namespace EcoBuildss.Core
         public bool Ts825Uygun;
         public string YanginNotu = "";
         public bool MevcutDuvar;             // yenileme: duvar yerinde kalır (Duvar yalnız taşıyıcı nesne)
+        public bool PencereDegisir = true;   // false: mevcut pencereler kalır (Cam yalnız taşıyıcı nesne)
         public string DuvarAdi => MevcutDuvar ? "Mevcut duvar" : Duvar.KisaAd;       // yangın yönetmeliğinin bu pakete getirdiği koşul (boş = koşul yok)
         public string Kod => Yalitim.Id + Cam.Id + Duvar.Id;
     }
@@ -56,6 +59,7 @@ namespace EcoBuildss.Core
         public string YakitAdi = "Doğalgaz", YakitId = "DG";
         public double SogutmaDG, ElektrikTL, ElektrikEmisyon, Seer;
         public bool Sogutma, Mevcut;
+        public bool PencereDegisir = true, CatiYalitimi = true, ZeminYalitimi = true;   // işin kapsamı
         public double MevcutGiderTL, MevcutIsitmaKWh, MevcutCO2Kg;   // yenilemede yalıtımsız mevcut binanın yıllık gideri, ısıtması, analiz süresince CO₂'si
         public double BinaYuksekligi;
         public int YanginElenen;
@@ -153,6 +157,12 @@ namespace EcoBuildss.Core
             r.Zemin = Katman('Z', v.P("M2"), r.SinirZemin);
             r.CatiU = EnerjiModeli.EkKatmanU(v.P("M3"), r.Cati);
             r.ZeminU = EnerjiModeli.EkKatmanU(v.P("M2"), r.Zemin);
+            if (g.Mevcut)
+            {
+                r.PencereDegisir = g.PencereDegisir; r.CatiYalitimi = g.CatiYalitimi; r.ZeminYalitimi = g.ZeminYalitimi;
+                if (!g.CatiYalitimi) r.CatiU = v.P("M3");     // çatı olduğu gibi kalır
+                if (!g.ZeminYalitimi) r.ZeminU = v.P("M2");   // zemin olduğu gibi kalır
+            }
             r.HHavalandirma = v.P("V3") * v.P("V1") * v.P("V2") * r.Hacim;
             r.HSabit = v.P("F1") * r.CatiU * r.CatiAlani + v.P("F2") * r.ZeminU * r.ZeminAlani + r.HHavalandirma;
             // Karşılaştırma için yalıtımsız referans kabuk (mevcut duvar U değeri + parametreler.csv referans U değerleri)
@@ -189,7 +199,7 @@ namespace EcoBuildss.Core
                 r.MevcutGiderTL = mGaz * r.GazTL + mSog * r.ElektrikTL;
                 r.MevcutCO2Kg = (mGaz * r.IsitmaEmisyon + mSog * r.ElektrikEmisyon) * g.Yil;
             }
-            r.SabitYatirim = (r.Cati.FiyatM2 * r.CatiAlani + r.Zemin.FiyatM2 * r.ZeminAlani) * g.MalzemeCarpani;
+            r.SabitYatirim = ((r.CatiYalitimi ? r.Cati.FiyatM2 * r.CatiAlani : 0) + (r.ZeminYalitimi ? r.Zemin.FiyatM2 * r.ZeminAlani : 0)) * g.MalzemeCarpani;
             return r;
         }
 
@@ -198,7 +208,8 @@ namespace EcoBuildss.Core
         {
             // Yenilemede duvar yerinde kalır: yalıtım mevcut duvarın (referans U) üstüne eklenir, duvar bedeli ve karbonu yoktur
             double uW = g.Mevcut ? EnerjiModeli.EkKatmanU(r.MevcutDuvarU, y) : EnerjiModeli.DuvarU(v, d, y);
-            double uP = r.PencereU[c.Id];
+            bool pencere = r.PencereDegisir;
+            double uP = pencere ? r.PencereU[c.Id] : v.P("M4");   // pencere değişmiyorsa mevcut pencerenin U değeri
             double h = uW * r.OpakDuvar + uP * r.CamAlani + r.HSabit;
             double isitma = r.Kalibrasyon * EnerjiModeli.YillikIsitma(r.DG, h);
             double gaz = isitma / r.IsitmaVerimi;
@@ -207,19 +218,20 @@ namespace EcoBuildss.Core
             double giderIsitma = gaz * r.GazTL, giderSogutma = sogElektrik * r.ElektrikTL, gider = giderIsitma + giderSogutma;
             double duvarFiyat = g.Mevcut ? 0 : d.FiyatM2, duvarKarbon = g.Mevcut ? 0 : d.KarbonM2;
             double yangin = YanginEkMaliyeti(v, r, y);
-            double yatirim = (r.OpakDuvar * (duvarFiyat + y.FiyatM2) + r.CamAlani * c.FiyatM2 + yangin) * g.MalzemeCarpani + r.SabitYatirim;
+            double yatirim = (r.OpakDuvar * (duvarFiyat + y.FiyatM2) + (pencere ? r.CamAlani * c.FiyatM2 : 0) + yangin) * g.MalzemeCarpani + r.SabitYatirim;
             return new Secenek
             {
-                Yalitim = y, Cam = c, Duvar = d, DuvarU = uW, PencereU = uP, H = h, MevcutDuvar = g.Mevcut,
+                Yalitim = y, Cam = c, Duvar = d, DuvarU = uW, PencereU = uP, H = h, MevcutDuvar = g.Mevcut, PencereDegisir = pencere,
                 YillikIsitmaKWh = isitma, YillikGazKWh = gaz, YillikGiderTL = gider, YillikIsitmaTL = giderIsitma,
                 YillikSogutmaKWh = sogutma, YillikSogutmaElektrikKWh = sogElektrik, YillikSogutmaTL = giderSogutma,
                 IlkYatirim = yatirim, YanginEkMaliyet = yangin * g.MalzemeCarpani, YanginNotu = YanginNotu(v, r, y),
                 DuvarAgirlikTon = r.OpakDuvar * ((g.Mevcut ? 0 : d.BirimAgirlik) + y.BirimAgirlik) / 1000,
                 ToplamMaliyet = yatirim + r.PWF * gider,                    // ömür boyu maliyet, bugünkü değer
-                ToplamCO2Kg = r.OpakDuvar * (duvarKarbon + y.KarbonM2) + r.CamAlani * c.KarbonM2
+                ToplamCO2Kg = r.OpakDuvar * (duvarKarbon + y.KarbonM2) + (pencere ? r.CamAlani * c.KarbonM2 : 0)
                               + (gaz * r.IsitmaEmisyon + sogElektrik * r.ElektrikEmisyon) * g.Yil,
-                Ts825Uygun = uW <= r.SinirDuvar && (r.CamAlani == 0 || uP <= r.SinirPencere)
-                             && r.CatiU <= r.SinirCati && r.ZeminU <= r.SinirZemin,
+                // Yenilemede yalnız işe dahil edilen bileşenler denetlenir (değişmeyen pencere/çatı/zemin teklifin konusu değildir)
+                Ts825Uygun = uW <= r.SinirDuvar && (!pencere || r.CamAlani == 0 || uP <= r.SinirPencere)
+                             && (!r.CatiYalitimi || r.CatiU <= r.SinirCati) && (!r.ZeminYalitimi || r.ZeminU <= r.SinirZemin),
             };
         }
 
@@ -232,7 +244,7 @@ namespace EcoBuildss.Core
             foreach (var y in v.Malzemeler.Where(m => m.Tur == 'Y'))
             {
                 if (!YanginaUygun(v, r, y)) { r.YanginElenen += v.Malzemeler.Count(m => m.Tur == 'P' && r.PencereU.ContainsKey(m.Id)) * duvarlar.Count(); continue; }
-                foreach (var c in v.Malzemeler.Where(m => m.Tur == 'P' && r.PencereU.ContainsKey(m.Id)))
+                foreach (var c in v.Malzemeler.Where(m => m.Tur == 'P' && r.PencereU.ContainsKey(m.Id)).Take(r.PencereDegisir ? int.MaxValue : 1))
                 foreach (var d in duvarlar)
                     liste.Add(Degerlendir(v, g, r, y, c, d));
             }
