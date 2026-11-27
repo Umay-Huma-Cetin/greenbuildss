@@ -255,7 +255,7 @@ static class Testler
                 var sema = Semalar.Teklif(v);
                 bool red = false; try { db.VeriKaydet(sema, tek.Kayitlar, ornek: true); } catch (UnauthorizedAccessException) { red = true; }
                 Dogrula(red, "Oturum açılmadan veri yazılamaz");
-                db.IlkYonetici("ayse", "Ayşe Çetin", "Gizli2026!");
+                db.IlkYonetici("umay", "Umay Hüma Çetin", "Gizli2026!");
                 db.VeriKaydet(sema, tek.Kayitlar, ornek: true);
                 var (geri, kaynak) = db.VeriOku(sema);
                 Dogrula(geri.Kayitlar.Count == 800 && geri.Reddedilen == 0 && kaynak == "Örnek", "Veri kaydedilip aynen okunur", geri.Ozet);
@@ -269,7 +269,7 @@ static class Testler
                 Dogrula(l.Count == 1 && l[0].Sonuc == "Kabul" && l[0].Musteri == t.Musteri, "Teklif kaydı ve sonuç (parametreli SQL)");
                 var csv = IceAktarici.Metinden(db.SonuclananTekliflerCsv(sema), sema);
                 Dogrula(csv.Kayitlar.Count == 1 && csv.Reddedilen == 0, "Sonuçlanan teklifler eğitim verisine dönüşür", csv.Ozet);
-                Dogrula(l[0].Hazirlayan == "ayse", "Teklifi kimin hazırladığı kaydedilir");
+                Dogrula(l[0].Hazirlayan == "umay", "Teklifi kimin hazırladığı kaydedilir");
 
                 // ---- Güvenlik ----
                 Bolum("Güvenlik ve işlem günlüğü");
@@ -277,7 +277,7 @@ static class Testler
                 Dogrula(Parola.Dogrula("Deneme123", ozet) && !Parola.Dogrula("deneme123", ozet), "Parola doğrulama (büyük/küçük harf duyarlı)");
                 Dogrula(!ozet.Contains("Deneme123") && ozet.StartsWith("pbkdf2-sha256$1000$"), "Parola açık metin saklanmaz (PBKDF2-SHA256)");
                 Dogrula(Parola.Ozetle("Deneme123", 1000) != ozet, "Her parola özeti farklı tuzla üretilir");
-                Dogrula(Parola.Kural("kisa1", "x") != null && Parola.Kural("sadeceharf", "x") != null && Parola.Kural("ayse2026x", "ayse") != null && Parola.Kural("Guvenli99", "ayse") == null, "Parola kuralı");
+                Dogrula(Parola.Kural("kisa1", "x") != null && Parola.Kural("sadeceharf", "x") != null && Parola.Kural("umay2026x", "umay") != null && Parola.Kural("Guvenli99", "umay") == null, "Parola kuralı");
                 var satis = db.KullaniciEkle("mehmet", "Mehmet Yılmaz", Rol.Satis, "Satis2026!");
                 db.OturumKapat();
                 Dogrula(db.GirisYap("mehmet", "yanlis-parola1") == GirisSonucu.HataliBilgi, "Hatalı parola reddedilir");
@@ -294,12 +294,12 @@ static class Testler
                 for (int i = 0; i < Veritabani.AzamiHataliDeneme - 1; i++) db.GirisYap("mehmet", "yanlis" + i + "abc");
                 Dogrula(db.GirisYap("mehmet", "yanlis-son-1") == GirisSonucu.Kilitli, "5 hatalı denemede hesap kilitlenir");
                 Dogrula(db.GirisYap("mehmet", "Kendi2026x") == GirisSonucu.Kilitli, "Kilitliyken doğru parola da kabul edilmez");
-                Dogrula(db.GirisYap("ayse", "Gizli2026!") == GirisSonucu.Basarili, "Yönetici girişi");
+                Dogrula(db.GirisYap("umay", "Gizli2026!") == GirisSonucu.Basarili, "Yönetici girişi");
                 yasak = false; try { db.KullaniciGuncelle(db.Aktif!.Id, Rol.Satis, true); } catch (InvalidOperationException) { yasak = true; }
                 Dogrula(yasak, "Son yönetici yetkisi kaldırılamaz");
                 db.ParolaSifirla(satis.Id, "YeniParola7");
                 Dogrula(db.GunlukOku().Any(g => g.Islem == "Başarısız giriş" && g.Seviye == "Güvenlik") && db.GunlukOku().Any(g => g.Islem == "Yetkisiz istek"), "Başarısız giriş ve yetkisiz istek günlüğe yazılır");
-                Dogrula(db.GunlukOku().Any(g => g.Islem == "Teklif kaydedildi" && g.Kullanici == "ayse"), "Günlükte işlemi yapan kullanıcı var");
+                Dogrula(db.GunlukOku().Any(g => g.Islem == "Teklif kaydedildi" && g.Kullanici == "umay"), "Günlükte işlemi yapan kullanıcı var");
                 var (n, sorun) = db.GunlukDogrula();
                 Dogrula(sorun == null && n > 10, "Günlük zinciri sağlam", sorun ?? "");
                 // Yedek
@@ -311,12 +311,12 @@ static class Testler
                 Dogrula(db.FiyatGuncellemeleri().Single() is var fg && fg.id == "Y2" && fg.fiyat == 900 && fg.kaynak == "Tedarikçi teklifi", "Fiyat güncellemesi veritabanında saklanır");
                 db.FiyatSil("Y2");
                 var t2 = db.Teklifler().First(x => x.Il == "Malatya" && x.TeklifTL == 1);
-                Dogrula(t2.KullanimAlani == 100 && t2.Hazirlayan == "ayse", "Şifreli teklif ayrıntıları eksiksiz geri okunur");
+                Dogrula(t2.KullanimAlani == 100 && t2.Hazirlayan == "umay", "Şifreli teklif ayrıntıları eksiksiz geri okunur");
                 string sonNo = db.YeniTeklifNo(); db.TeklifSil(db.Teklifler().OrderBy(x => x.TeklifNo).First().Id);
                 Dogrula(db.YeniTeklifNo() == sonNo, "Teklif silinse de yeni numara çakışmaz");
                 db.GeriYukle(yedek);
                 Dogrula(db.Aktif == null, "Geri yüklemeden sonra yeniden oturum açılmalı");
-                db.GirisYap("ayse", "Gizli2026!");
+                db.GirisYap("umay", "Gizli2026!");
                 Dogrula(db.Teklifler().Count == 1 && db.Teklifler()[0].Musteri == t.Musteri, "Yedekten geri yükleme (şifreli alanlar çözülür)");
                 Dogrula(db.Yedekler().Count >= 2, "Geri yüklemeden önce mevcut durum yedeklenir");
                 Dogrula(db.OtomatikYedek() != null && db.OtomatikYedek() == null, "Otomatik yedek günde bir kez alınır");
@@ -346,18 +346,18 @@ static class Testler
             }
             using (var db = new Veritabani(dosya))
             {
-                bool hata = false; try { db.KurtarmaIleSifirla("ayse", "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE", "Yeni2026xx"); } catch (ArgumentException) { hata = true; }
+                bool hata = false; try { db.KurtarmaIleSifirla("umay", "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE", "Yeni2026xx"); } catch (ArgumentException) { hata = true; }
                 Dogrula(hata, "Yanlış kurtarma anahtarı reddedilir");
                 Dogrula(kurtarma != null && kurtarma.Length == 29, "İlk kurulumda kurtarma anahtarı üretilir");
-                db.KurtarmaIleSifirla("ayse", kurtarma!.ToLowerInvariant().Replace("-", " "), "Yeni2026xx");
-                Dogrula(db.GirisYap("ayse", "Yeni2026xx") == GirisSonucu.Basarili && db.Teklifler()[0].TeklifTL == 500000, "Kurtarma anahtarıyla parola yenilenir, veri okunur");
+                db.KurtarmaIleSifirla("umay", kurtarma!.ToLowerInvariant().Replace("-", " "), "Yeni2026xx");
+                Dogrula(db.GirisYap("umay", "Yeni2026xx") == GirisSonucu.Basarili && db.Teklifler()[0].TeklifTL == 500000, "Kurtarma anahtarıyla parola yenilenir, veri okunur");
                 bool red = false; try { db.KurtarmaAnahtariYenile("yanlis-parola1"); } catch (UnauthorizedAccessException) { red = true; }
                 Dogrula(red, "Kurtarma anahtarı yenilemek için parola gerekir");
                 string yeniK = db.KurtarmaAnahtariYenile("Yeni2026xx");
-                bool eskiGecmez = false; try { db.KurtarmaIleSifirla("ayse", kurtarma!, "Baska2026xx"); } catch (ArgumentException) { eskiGecmez = true; }
+                bool eskiGecmez = false; try { db.KurtarmaIleSifirla("umay", kurtarma!, "Baska2026xx"); } catch (ArgumentException) { eskiGecmez = true; }
                 Dogrula(eskiGecmez && yeniK != kurtarma, "Yeni kurtarma anahtarından sonra eskisi geçersiz");
                 db.OturumKapat();
-                Dogrula(db.GirisYap("ayse", "Gizli2026!") == GirisSonucu.HataliBilgi, "Eski parola artık geçmez");
+                Dogrula(db.GirisYap("umay", "Gizli2026!") == GirisSonucu.HataliBilgi, "Eski parola artık geçmez");
             }
             // Günlük sonradan değiştirilirse zincir bozulur
             using (var ham = new SqliteBaglanti(dosya)) ham.Yaz("UPDATE islem_gunlugu SET ayrinti = 'değiştirildi' WHERE id = 3");
