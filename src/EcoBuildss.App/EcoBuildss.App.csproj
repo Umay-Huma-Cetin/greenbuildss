@@ -21,6 +21,6 @@
   <ItemGroup>
     <!-- Kaynak gösterimli referans veri ve örnek (sentetik) veri programın yanına kopyalanır -->
     <None Include="..\..\veri\referans\*.csv" Link="veri\referans\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\..\veri\ornek\*.csv" Link="veri\ornek\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\veri\referans\BUTUNLUK.sha256" Link="veri\referans\BUTUNLUK.sha256" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

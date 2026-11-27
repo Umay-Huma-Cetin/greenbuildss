@@ -50,7 +50,6 @@ namespace EcoBuildss.UI
         public void TekliflerDegistiDuyur() => TekliflerDegisti?.Invoke();
 
         public string Referans => Path.Combine(Kok, "veri", "referans");
-        public string Ornek => Path.Combine(Kok, "veri", "ornek");
 
         public Sema TuketimSemasi => Semalar.Tuketim(V);
         public Sema TeklifSemasi => Semalar.Teklif(V);
@@ -92,6 +91,5 @@ namespace EcoBuildss.UI
             ModellerDegistiDuyur();
         }
 
-        public bool OrnekVeriKullaniliyor => Tuketim().kaynak == "Örnek" || Teklifler().kaynak.StartsWith("Örnek");
     }
 }

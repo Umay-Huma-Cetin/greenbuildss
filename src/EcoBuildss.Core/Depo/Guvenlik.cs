@@ -10,7 +10,7 @@ namespace EcoBuildss.Core.Depo
 {
     public enum Rol { Satis, Yonetici }
     public enum Seviye { Bilgi, Uyari, Hata, Guvenlik }
-    public enum GirisSonucu { Basarili, HataliBilgi, Kilitli, Pasif }
+    public enum GirisSonucu { Basarili, HataliBilgi, Kilitli, Pasif, AnahtarYok }
 
     public sealed class Kullanici
     {
@@ -89,6 +89,9 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
   id INTEGER PRIMARY KEY AUTOINCREMENT, kullanici_adi TEXT NOT NULL UNIQUE COLLATE NOCASE, ad_soyad TEXT NOT NULL,
   rol TEXT NOT NULL CHECK (rol IN ('Yönetici','Satış')), parola TEXT NOT NULL, aktif INTEGER NOT NULL DEFAULT 1,
   hatali_deneme INTEGER NOT NULL DEFAULT 0, kilit_bitis TEXT, son_giris TEXT, olusturma TEXT NOT NULL)");
+            b.Calistir("CREATE TABLE IF NOT EXISTS anahtarlar (sahip TEXT PRIMARY KEY, tuz TEXT NOT NULL, sarili TEXT NOT NULL)");
+            if (!b.Sorgu("PRAGMA table_info(teklifler)").Any(r => (string?)r["name"] == "gizli"))
+                b.Calistir("ALTER TABLE teklifler ADD COLUMN gizli TEXT NOT NULL DEFAULT ''");
             var sutun = b.Sorgu("PRAGMA table_info(islem_gunlugu)").Select(r => (string)r["name"]!).ToList();
             if (!b.Sorgu("PRAGMA table_info(kullanicilar)").Any(r => (string?)r["name"] == "parola_degismeli"))
                 b.Calistir("ALTER TABLE kullanicilar ADD COLUMN parola_degismeli INTEGER NOT NULL DEFAULT 0");
@@ -116,6 +119,7 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
         {
             string tarih = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
             string kim = Aktif?.KullaniciAdi ?? "(oturum yok)", sev = SeviyeAdi(seviye);
+            if (dek != null) ayrinti = Sifreleme.Sifrele(dek, ayrinti);   // ayrıntıda müşteri adı ve tutar olabilir
             b.Islem(() =>
             {
                 var son = b.Sorgu("SELECT id, ozet FROM islem_gunlugu ORDER BY id DESC LIMIT 1");
@@ -161,7 +165,7 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
                 .Select(r => new GunlukKaydi
                 {
                     Id = (long)r["id"]!, Tarih = DateTime.ParseExact(S(r["tarih"]).Length > 19 ? S(r["tarih"]).Substring(0, 19) : S(r["tarih"]), "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
-                    Kullanici = S(r["kullanici"]), Seviye = S(r["seviye"]), Islem = S(r["islem"]), Ayrinti = S(r["ayrinti"]),
+                    Kullanici = S(r["kullanici"]), Seviye = S(r["seviye"]), Islem = S(r["islem"]), Ayrinti = Coz(S(r["ayrinti"])),
                 }).ToList();
         }
 
@@ -179,6 +183,8 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
         {
             if (KullaniciSayisi > 0) throw new InvalidOperationException("İlk yönetici zaten oluşturulmuş.");
             var k = Ekle(kullaniciAdi, adSoyad, Rol.Yonetici, parola);
+            AnahtarOlustur();
+            AnahtarSar(k.KullaniciAdi, parola);
             Aktif = k;
             Gunluk("İlk kurulum", $"Yönetici hesabı oluşturuldu: {k.KullaniciAdi}", Seviye.Guvenlik);
             return k;
@@ -189,6 +195,7 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
             Yetki(yonetici: true, "Kullanıcı ekleme");
             var k = Ekle(kullaniciAdi, adSoyad, rol, parola);
             b.Yaz("UPDATE kullanicilar SET parola_degismeli = 1 WHERE id = @id", new Dictionary<string, object?> { ["id"] = k.Id });
+            AnahtarSar(k.KullaniciAdi, parola);
             Gunluk("Kullanıcı eklendi", $"{k.KullaniciAdi} · {k.RolAdi}", Seviye.Guvenlik);
             return k;
         }
@@ -228,8 +235,17 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
                 Gunluk("Başarısız giriş", kilit ? $"{ad}: {AzamiHataliDeneme} hatalı deneme, hesap {KilitSuresi.TotalMinutes:0} dakika kilitlendi" : $"{ad}: hatalı parola ({deneme}/{AzamiHataliDeneme})", Seviye.Guvenlik);
                 return kilit ? GirisSonucu.Kilitli : GirisSonucu.HataliBilgi;
             }
+            // Veri anahtarı bu kullanıcının parolasıyla açılır
+            var kullanici = Oku(u);
+            byte[]? anahtar = AnahtarAc(ad, parola);
+            if (anahtar == null)
+            {
+                if (AnahtarSayisi == 0 && kullanici.Yonetici) { AnahtarOlustur(); AnahtarSar(ad, parola); anahtar = dek; }   // şifrelemesiz eski sürümden geçiş
+                else { Gunluk("Başarısız giriş", $"{ad}: veri anahtarı yok, yönetici parolayı sıfırlamalı", Seviye.Guvenlik); return GirisSonucu.AnahtarYok; }
+            }
+            dek = anahtar;
             b.Yaz("UPDATE kullanicilar SET hatali_deneme = 0, kilit_bitis = NULL, son_giris = @t WHERE id = @id", new Dictionary<string, object?> { ["t"] = DateTime.Now, ["id"] = id });
-            Aktif = Oku(u);
+            Aktif = kullanici;
             Gunluk("Oturum açıldı", $"{Aktif.KullaniciAdi} · {Aktif.RolAdi}", Seviye.Guvenlik);
             return GirisSonucu.Basarili;
         }
@@ -239,6 +255,7 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
             if (Aktif == null) return;
             Gunluk("Oturum kapandı", $"{Aktif.KullaniciAdi} · {neden}", Seviye.Guvenlik);
             Aktif = null;
+            if (dek != null) { Array.Clear(dek, 0, dek.Length); dek = null; }   // anahtar bellekten silinir
         }
 
         public void ParolaDegistir(string eski, string yeni)
@@ -249,6 +266,7 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
             if (Parola.Kural(yeni, Aktif.KullaniciAdi) is string k) throw new ArgumentException(k);
             b.Yaz("UPDATE kullanicilar SET parola = @p, parola_degismeli = 0 WHERE id = @id", new Dictionary<string, object?> { ["p"] = Parola.Ozetle(yeni), ["id"] = Aktif.Id });
             Aktif.ParolaDegismeli = false;
+            AnahtarSar(Aktif.KullaniciAdi, yeni);
             Gunluk("Parola değiştirildi", Aktif.KullaniciAdi, Seviye.Guvenlik);
         }
 
@@ -258,6 +276,7 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
             var k = Kullanicilar().First(x => x.Id == id);
             if (Parola.Kural(yeni, k.KullaniciAdi) is string m) throw new ArgumentException(m);
             b.Yaz("UPDATE kullanicilar SET parola = @p, hatali_deneme = 0, kilit_bitis = NULL, parola_degismeli = 1 WHERE id = @id", new Dictionary<string, object?> { ["p"] = Parola.Ozetle(yeni), ["id"] = id });
+            AnahtarSar(k.KullaniciAdi, yeni);
             Gunluk("Parola sıfırlandı", k.KullaniciAdi, Seviye.Guvenlik);
         }
 
@@ -278,6 +297,87 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
             Id = (long)u["id"]!, KullaniciAdi = S(u["kullanici_adi"]), AdSoyad = S(u["ad_soyad"]), Rol = S(u["rol"]) == "Yönetici" ? Rol.Yonetici : Rol.Satis,
             Aktif = (long)u["aktif"]! == 1, ParolaDegismeli = u.TryGetValue("parola_degismeli", out var pd) && pd is long l && l == 1, SonGiris = u["son_giris"] is string sg ? DateTime.ParseExact(sg, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) : null,
         };
+
+        // ======================= Şifreleme anahtarı =======================
+        byte[]? dek;
+        /// <summary>İlk kurulumda (ya da şifrelemesiz sürümden geçişte) üretilen kurtarma anahtarı: bir kez gösterilir, sonra silinir.</summary>
+        public string? YeniKurtarmaAnahtari { get; private set; }
+        public void KurtarmaAnahtariGosterildi() => YeniKurtarmaAnahtari = null;
+        public bool Sifreli => dek != null;
+        int AnahtarSayisi => (int)(long)b.Sorgu("SELECT COUNT(*) AS n FROM anahtarlar")[0]["n"]!;
+
+        void AnahtarOlustur()
+        {
+            dek = Sifreleme.YeniAnahtar();
+            string kurtarma = Sifreleme.KurtarmaAnahtari();
+            AnahtarSar("#kurtarma", Sifreleme.KurtarmaSade(kurtarma));
+            YeniKurtarmaAnahtari = kurtarma;
+            MevcutVeriyiSifrele();
+        }
+
+        void AnahtarSar(string sahip, string sir)
+        {
+            if (dek == null) throw new InvalidOperationException("Veri anahtarı açık değil.");
+            var tuz = Sifreleme.RastgeleBayt(16);
+            var kek = Sifreleme.Turet(sir, tuz);
+            b.Yaz("INSERT OR REPLACE INTO anahtarlar (sahip, tuz, sarili) VALUES (@s, @t, @w)", new Dictionary<string, object?>
+            { ["s"] = sahip.ToLowerInvariant(), ["t"] = Convert.ToBase64String(tuz), ["w"] = Convert.ToBase64String(Sifreleme.SifreleBayt(kek, dek)) });
+            Array.Clear(kek, 0, kek.Length);
+        }
+
+        byte[]? AnahtarAc(string sahip, string sir)
+        {
+            var r = b.Sorgu("SELECT tuz, sarili FROM anahtarlar WHERE sahip = @s", new Dictionary<string, object?> { ["s"] = sahip.ToLowerInvariant() });
+            if (r.Count == 0) return null;
+            var kek = Sifreleme.Turet(sir, Convert.FromBase64String(S(r[0]["tuz"])));
+            try { return Sifreleme.CozBayt(kek, Convert.FromBase64String(S(r[0]["sarili"]))); }
+            catch (CryptographicException) { return null; }
+            finally { Array.Clear(kek, 0, kek.Length); }
+        }
+
+        /// <summary>Kurtarma anahtarıyla bir yöneticinin parolasını yeniler (parola unutulduğunda veriye erişimin tek yolu).</summary>
+        public void KurtarmaIleSifirla(string kullaniciAdi, string kurtarmaAnahtari, string yeniParola)
+        {
+            var k = Kullanicilar().FirstOrDefault(x => string.Equals(x.KullaniciAdi, kullaniciAdi.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (k == null || !k.Yonetici || !k.Aktif) { Gunluk("Kurtarma reddedildi", $"{kullaniciAdi.Trim()}: etkin yönetici değil", Seviye.Guvenlik); throw new ArgumentException("Kurtarma yalnız etkin bir yönetici hesabı için yapılabilir."); }
+            if (Parola.Kural(yeniParola, k.KullaniciAdi) is string m) throw new ArgumentException(m);
+            var acik = AnahtarAc("#kurtarma", Sifreleme.KurtarmaSade(kurtarmaAnahtari));
+            if (acik == null) { Gunluk("Kurtarma reddedildi", $"{k.KullaniciAdi}: kurtarma anahtarı hatalı", Seviye.Guvenlik); throw new ArgumentException("Kurtarma anahtarı hatalı."); }
+            var onceki = dek; dek = acik;
+            try
+            {
+                b.Yaz("UPDATE kullanicilar SET parola = @p, parola_degismeli = 0, hatali_deneme = 0, kilit_bitis = NULL WHERE id = @id", new Dictionary<string, object?> { ["p"] = Parola.Ozetle(yeniParola), ["id"] = k.Id });
+                AnahtarSar(k.KullaniciAdi, yeniParola);
+                Gunluk("Kurtarma anahtarıyla parola yenilendi", k.KullaniciAdi, Seviye.Guvenlik);
+            }
+            finally { Array.Clear(acik, 0, acik.Length); dek = onceki; }
+        }
+
+        string Sifrele(string s) => dek == null ? throw new UnauthorizedAccessException("Oturum açık değil.") : Sifreleme.Sifrele(dek, s);
+        string Coz(string s)
+        {
+            if (!Sifreleme.Sifreli(s)) return s;
+            if (dek == null) return "(şifreli)";
+            try { return Sifreleme.Coz(dek, s); } catch (CryptographicException) { return "(çözülemedi: değiştirilmiş)"; }
+        }
+
+        /// <summary>Şifrelemesiz eski sürümden kalan teklif ve veri kayıtlarını şifreler (günlük kayıtları zincir bozulmasın diye olduğu gibi kalır).</summary>
+        void MevcutVeriyiSifrele()
+        {
+            b.Islem(() =>
+            {
+                foreach (var r in b.Sorgu("SELECT veri_seti, anahtar, satir FROM veri_kayitlari"))
+                    if (!Sifreleme.Sifreli(S(r["satir"])))
+                        b.Yaz("UPDATE veri_kayitlari SET satir = @s WHERE veri_seti = @v AND anahtar = @a", new Dictionary<string, object?> { ["s"] = Sifrele(S(r["satir"])), ["v"] = r["veri_seti"], ["a"] = r["anahtar"] });
+                foreach (var r in b.Sorgu("SELECT id, musteri, teklif_tl, teklif_tl_m2, indirim_orani, kabul_olasiligi FROM teklifler WHERE gizli = ''"))
+                    b.Yaz("UPDATE teklifler SET gizli = @g, musteri = '', teklif_tl = 0, teklif_tl_m2 = 0, indirim_orani = 0, kabul_olasiligi = NULL WHERE id = @id", new Dictionary<string, object?>
+                    { ["g"] = Sifrele(GizliBirlestir(S(r["musteri"]), D(r["teklif_tl"]), D(r["teklif_tl_m2"]), D(r["indirim_orani"]), r["kabul_olasiligi"] == null ? null : D(r["kabul_olasiligi"]))), ["id"] = r["id"] });
+            });
+        }
+
+        static string GizliBirlestir(string musteri, double tl, double tlm2, double indirim, double? kabul) =>
+            string.Join("\u001f", musteri, tl.ToString("R", CultureInfo.InvariantCulture), tlm2.ToString("R", CultureInfo.InvariantCulture),
+                        indirim.ToString("R", CultureInfo.InvariantCulture), kabul?.ToString("R", CultureInfo.InvariantCulture) ?? "");
 
         // ======================= Yedekleme =======================
         public string YedekKlasoru => Path.Combine(Path.GetDirectoryName(Dosya)!, "yedek");
@@ -321,10 +421,12 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
             using (var kontrol = new SqliteBaglanti(yedekDosyasi, pragmasiz: true))
                 if (kontrol.Sorgu("SELECT name FROM sqlite_master WHERE type='table' AND name='teklifler'").Count == 0) throw new InvalidDataException("Seçilen dosya bir EcoBuildss yedeği değil.");
             string onceki = YedekAl("geri-yukleme-oncesi");
+            Gunluk("Yedekten geri yükleniyor", $"{Path.GetFileName(yedekDosyasi)} · önceki durum: {Path.GetFileName(onceki)}", Seviye.Guvenlik);
             b.Yedekle(yedekDosyasi, geriYukle: true);
             GuvenlikKur();
-            Aktif = Kullanicilar().FirstOrDefault(x => x.KullaniciAdi == kim.KullaniciAdi && x.Aktif) ?? kim;
-            Gunluk("Yedekten geri yüklendi", $"{Path.GetFileName(yedekDosyasi)} · önceki durum: {Path.GetFileName(onceki)}", Seviye.Guvenlik);
+            // Yedekteki kullanıcılar ve anahtarlar geçerli olur: yeniden oturum açılmalı
+            Aktif = null; if (dek != null) { Array.Clear(dek, 0, dek.Length); dek = null; }
+            Gunluk("Yedekten geri yüklendi", $"{kim.KullaniciAdi}: {Path.GetFileName(yedekDosyasi)}; yeniden oturum açılmalı", Seviye.Guvenlik);
         }
     }
 }

@@ -32,21 +32,21 @@ namespace EcoBuildss.UI
             var optUst = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 34 };
             optUst.Controls.Add(Ui.Etiket("Yalıtım ailesi")); optUst.Controls.Add(aile);
             var opt = new Panel(); opt.Controls.Add(egri); egri.Dock = DockStyle.Fill; opt.Controls.Add(optMetin); optMetin.Dock = DockStyle.Bottom; opt.Controls.Add(optUst);
-            izgara.Controls.Add(Ui.Kart("Ekonomik yalıtım kalınlığı", opt, "Altın oran araması · ek santimetrenin fiyatı levha fiyatlarından regresyonla"), 0, 0);
+            izgara.Controls.Add(Ui.Kart("Ekonomik yalıtım kalınlığı", opt), 0, 0);
 
             var butUst = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 34 };
             butUst.Controls.Add(Ui.Etiket("Bütçe (TL)")); butUst.Controls.Add(butce); butUst.Controls.Add(Ui.Etiket("Amaç")); butUst.Controls.Add(amac);
             var but = new Panel(); but.Controls.Add(pareto); pareto.Dock = DockStyle.Fill; but.Controls.Add(butceMetin); butceMetin.Dock = DockStyle.Bottom; but.Controls.Add(butUst);
-            izgara.Controls.Add(Ui.Kart("Bütçe kısıtlı seçim ve Pareto cephesi", but, "Bütçeye sığan TS 825 uyumlu paketler içinde amaca göre en iyisi"), 1, 0);
+            izgara.Controls.Add(Ui.Kart("Bütçe kısıtlı seçim ve Pareto cephesi", but), 1, 0);
 
             var duy = new Panel { AutoScroll = true };
             foreach (var (c, ad) in new[] { (sure, "Analiz süresi (yıl)"), (artis, "Enerji fiyatının reel yıllık artışı (%)"), (malzeme, "Malzeme fiyatı değişimi (%)"), (gaz, "Enerji fiyatı değişimi (%)") })
             { duy.Controls.Add(c); duy.Controls.Add(new Label { Text = ad, Dock = DockStyle.Top, Height = 20, Font = Ui.Kalin }); }
-            izgara.Controls.Add(Ui.Kart("Duyarlılık: öneri hangi aralıkta değişmiyor?", duy, "Her renk bir önerilen paket; dikey çizgi bugünkü değer"), 0, 1);
+            izgara.Controls.Add(Ui.Kart("Duyarlılık: öneri hangi aralıkta değişmiyor?", duy), 0, 1);
 
             var mcp = new Panel(); mcp.Controls.Add(mc); mcp.Controls.Add(mcMetin); mcMetin.Dock = DockStyle.Top;
-            var mcUst = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 36 }; mcUst.Controls.Add(Ui.Dugme("1.000 senaryo çalıştır", (_, __) => MonteCarlo(), true)); mcp.Controls.Add(mcUst);
-            izgara.Controls.Add(Ui.Kart("Monte Carlo: fiyat belirsizliği", mcp, "Kaynakların verdiği fiyat aralıklarında rastgele fiyatlar (düzgün dağılım, sabit tohum)"), 1, 1);
+            var mcUst = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 36 }; mcUst.Controls.Add(Ui.Dugme("Çalıştır", (_, __) => MonteCarlo(), true)); mcp.Controls.Add(mcUst);
+            izgara.Controls.Add(Ui.Kart("Monte Carlo: fiyat belirsizliği", mcp), 1, 1);
 
             Controls.Add(izgara);
             aile.SelectedIndexChanged += (_, __) => Optimum();
@@ -64,7 +64,7 @@ namespace EcoBuildss.UI
             sonKod = kod;
             butce.Value = Math.Min(butce.Maximum, (decimal)Math.Round(r.Siralama[0].IlkYatirim / 10000) * 10000);
             Optimum(); Butce(); Duyarlilik();
-            mcMetin.Text = "Çalıştırmak için düğmeye basın."; mc.Cubuklar.Clear(); mc.Invalidate();
+            mcMetin.Text = ""; mc.Cubuklar.Clear(); mc.Invalidate();
         }
 
         void Optimum()

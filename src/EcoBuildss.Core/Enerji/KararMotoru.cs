@@ -300,8 +300,8 @@ namespace EcoBuildss.Core
         public static string YanginNotu(VeriDeposu v, Sonuc r, Malzeme y)
         {
             if (HicYanmaz(v, y)) return "";
-            string n = $"Yangın yönetmeliği (Md. 27/2-b): zeminden {v.P("B2").ToString("0.0#", Ortak.TR)} m yüksekliğe kadar hiç yanmaz (A1) yalıtım (bedeli eklendi)";
-            if (r.BinaYuksekligi > v.P("B3")) n += $"; bina {v.P("B3").ToString("0.0#", Ortak.TR)} m'den yüksek: pencere yanlarında en az 15 cm, üstünde 30 cm hiç yanmaz yangın bariyeri (pencere ölçüsü girilmediği için bedele eklenmedi)";
+            string n = $"Yangın md. 27: zeminden {v.P("B2").ToString("0.0#", Ortak.TR)} m A1 yalıtım (bedeli dahil)";
+            if (r.BinaYuksekligi > v.P("B3")) n += "; pencere çevresine A1 yangın bariyeri gerekir (bedele dahil değil)";
             return n + ".";
         }
 

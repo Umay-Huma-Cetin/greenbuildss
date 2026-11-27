@@ -35,7 +35,7 @@ namespace EcoBuildss.UI
             yakit = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 240 };
         readonly NumericUpDown katH = Sayi(2.4m, 6, 3, 2), camOrani = Sayi(0, 90, 20, 0), mevcutU = Sayi(0.3m, 3.5m, 1.78m, 2), yil = Sayi(5, 50, 20, 0),
             kar = Sayi(0, 100, 18, 0), indirim = Sayi(0, 60, 0, 1), yanit = Sayi(0, 365, 2, 0);
-        readonly CheckBox klima = new() { Text = "Klima ile soğutma var", AutoSize = true }, rakip = new() { Text = "Müşteri başka teklif de aldı", AutoSize = true };
+        readonly CheckBox klima = new() { Text = "Klima var", AutoSize = true }, rakip = new() { Text = "Rakip teklif var", AutoSize = true };
         readonly Panel digerPanel = new() { AutoSize = true, Visible = false };
         readonly Label mevcutEtiket = Ui.Etiket("Mevcut duvar U (W/m²K)"), ilBilgi = Ui.Aciklama("", 240);
         // ---- sonuçlar ----
@@ -60,6 +60,7 @@ namespace EcoBuildss.UI
         public TeklifSekmesi(Durum durum)
         {
             d = durum;
+            mevcutU.Value = Math.Min(mevcutU.Maximum, Math.Max(mevcutU.Minimum, (decimal)d.V.P("M1")));   // Türkiye ölçümü: Mıhlayanlar & Meral (2023)
             BackColor = Ui.Zemin;
             foreach (var i in d.V.Iller.Where(i => i.Ts825Bolge.HasValue).OrderBy(i => i.Ad, StringComparer.Create(Ui.TR, false))) il.Items.Add(i);
             il.SelectedItem = d.V.VarsayilanIl;
@@ -90,8 +91,8 @@ namespace EcoBuildss.UI
             OncelikRenk();
 
             // "Diğer ayarlar" — gerektiğinde açılır
-            var ac = new LinkLabel { Text = "Diğer ayarlar ▾", AutoSize = true, Font = Ui.Kalin, LinkColor = Ui.Yesil, Margin = new Padding(0, 18, 0, 4) };
-            ac.LinkClicked += (_, __) => { digerPanel.Visible = !digerPanel.Visible; ac.Text = digerPanel.Visible ? "Diğer ayarlar ▴" : "Diğer ayarlar ▾"; };
+            var ac = new LinkLabel { Text = "Ayarlar ▾", AutoSize = true, Font = Ui.Kalin, LinkColor = Ui.Yesil, Margin = new Padding(0, 18, 0, 4) };
+            ac.LinkClicked += (_, __) => { digerPanel.Visible = !digerPanel.Visible; ac.Text = digerPanel.Visible ? "Ayarlar ▴" : "Ayarlar ▾"; };
             sol.Controls.Add(ac);
             var dp = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0) };
             Alan(dp, "Müşteri / proje adı", musteri); Alan(dp, "Müşteri tipi", musteriTipi);
@@ -142,9 +143,9 @@ namespace EcoBuildss.UI
             tutarSatiri.Controls.Add(ozTutar); ozAlt.Margin = new Padding(6, 14, 18, 0); tutarSatiri.Controls.Add(ozAlt); ozKabul.Margin = new Padding(0, 12, 0, 0); tutarSatiri.Controls.Add(ozKabul);
             ozSol.Controls.Add(tutarSatiri); ozSol.Controls.Add(ozSatir); ozSol.Controls.Add(ozNot);
             var ozSag = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(0, 8, 0, 0) };
-            var kaydet = Ui.Dugme("Teklifi kaydet", (_, __) => Kaydet(), true); kaydet.Width = 170; kaydet.AutoSize = false; kaydet.Height = 36;
-            var ayrinti = Ui.Dugme("Ayrıntılar, Excel, yazdır…", (_, __) => Ayrintilar()); ayrinti.Width = 170; ayrinti.AutoSize = false; ayrinti.Height = 32;
-            var analiz = Ui.Dugme("Ayrıntılı analiz…", (_, __) => Analiz()); analiz.Width = 170; analiz.AutoSize = false; analiz.Height = 32;
+            var kaydet = Ui.Dugme("Kaydet", (_, __) => Kaydet(), true); kaydet.Width = 170; kaydet.AutoSize = false; kaydet.Height = 36;
+            var ayrinti = Ui.Dugme("Ayrıntılar", (_, __) => Ayrintilar()); ayrinti.Width = 170; ayrinti.AutoSize = false; ayrinti.Height = 32;
+            var analiz = Ui.Dugme("Analiz", (_, __) => Analiz()); analiz.Width = 170; analiz.AutoSize = false; analiz.Height = 32;
             ozSag.Controls.Add(kaydet); ozSag.Controls.Add(ayrinti); ozSag.Controls.Add(analiz);
             ozet.Controls.Add(ozSol); ozet.Controls.Add(ozSag);
 
@@ -212,7 +213,7 @@ namespace EcoBuildss.UI
                 var onceki = secili;
                 Sec(onceki != null && onceki.Ad == "Özel" && r.Tum.Any(s => s.Kod == onceki.S.Kod) ? PaketHesapla("Özel", r.Tum.First(s => s.Kod == onceki.S.Kod))
                     : paketler.FirstOrDefault(p => p.Ad == onceki?.Ad) ?? paketler[1]);
-                if (uygunYok) d.Bildir("Bu binada hiçbir paket TS 825 sınırlarını sağlamıyor; en yakın paketler gösteriliyor.");
+                if (uygunYok) d.Bildir("TS 825'e uyan paket yok; en yakınlar gösteriliyor.");
             }
             catch (Exception e) { d.Hata("Hesap yapılamadı: " + e.Message, e); }
         }
@@ -271,8 +272,7 @@ namespace EcoBuildss.UI
             ozSatir.Text = $"{TeklifRaporu.PaketAdi(s)}   ·   {tasarruf}   ·   {geri}   ·   {(s.Ts825Uygun ? "TS 825'e uygun ✓" : "TS 825'e uygun değil")}";
             ozKabul.Text = p.KabulOlasiligi is double k2 ? $"Kazanma olasılığı {Ui.Olasilik(k2)}" : "";
             ozKabul.ForeColor = (p.KabulOlasiligi ?? 1) >= 0.5 ? Ui.Yesil : Ui.Kirmizi;
-            ozNot.Text = (r.Kalibrasyon != 1 ? $"Enerji, firmanın gerçek tüketim kayıtlarıyla düzeltildi (×{Ui.Sayi(r.Kalibrasyon, "0.00")}). " : "")
-                       + (s.YanginEkMaliyet > 0 ? "Yangın yönetmeliği gereği zemin şeridi taş yünü (bedeli dahil)." : "");
+            ozNot.Text = s.YanginEkMaliyet > 0 ? "Zemin şeridi taş yünü (yangın yönetmeliği)." : "";
         }
 
         /// <summary>Mühendis bir malzeme kartına tıklayınca seçili paketin yalnız o bileşeni değişir; teklif anında yeniden hesaplanır.</summary>
@@ -282,9 +282,9 @@ namespace EcoBuildss.UI
             var s = secili.S;
             string y = m.Tur == 'Y' ? m.Id : s.Yalitim.Id, c = m.Tur == 'P' ? m.Id : s.Cam.Id, du = m.Tur == 'D' ? m.Id : s.Duvar.Id;
             var yeni = SonSonuc.Tum.FirstOrDefault(x => x.Yalitim.Id == y && x.Cam.Id == c && x.Duvar.Id == du);
-            if (yeni == null) { d.Bildir($"{m.KisaAd} bu binada kullanılamıyor (yangın yönetmeliği ya da doğrama için TS 825 değeri yok)."); return; }
+            if (yeni == null) { d.Bildir($"{m.KisaAd} bu binada kullanılamaz."); return; }
             Sec(paketler.FirstOrDefault(p => p.S.Kod == yeni.Kod) ?? PaketHesapla("Özel", yeni));
-            if (!yeni.Ts825Uygun) d.Bildir($"Dikkat: {TeklifRaporu.PaketAdi(yeni)} TS 825 U sınırını sağlamıyor.");
+            if (!yeni.Ts825Uygun) d.Bildir($"{TeklifRaporu.PaketAdi(yeni)}: TS 825'e uygun değil.");
         }
 
         /// <summary>Ekonomik kalınlık, bütçe, duyarlılık ve Monte Carlo: ayrı pencerede.</summary>
@@ -345,11 +345,11 @@ namespace EcoBuildss.UI
             var sekme = new TabControl { Dock = DockStyle.Fill };
             var t1 = new TabPage("Keşif ve maliyet"); t1.Controls.Add(kesif);
             var t2 = new TabPage("Neden bu paket?"); t2.Controls.Add(gerekce);
-            var t3 = new TabPage("Tüm seçenekler (çift tıkla: teklife al)"); t3.Controls.Add(tum);
+            var t3 = new TabPage("Tüm seçenekler"); t3.Controls.Add(tum);
             sekme.TabPages.AddRange(new[] { t1, t2, t3 });
             var alt = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 44, Padding = new Padding(8, 4, 0, 0) };
-            alt.Controls.Add(Ui.Dugme("Excel'e aktar", (_, __) => Excel(f)));
-            alt.Controls.Add(Ui.Dugme("Yazdır / PDF", (_, __) => Yazdir(kesif, gerekce.Text, f)));
+            alt.Controls.Add(Ui.Dugme("Excel", (_, __) => Excel(f)));
+            alt.Controls.Add(Ui.Dugme("Yazdır", (_, __) => Yazdir(kesif, gerekce.Text, f)));
             f.Controls.Add(sekme); f.Controls.Add(alt);
             f.ShowDialog(this);
         }
@@ -368,7 +368,7 @@ namespace EcoBuildss.UI
                 TeklifTL = secili.TeklifTL, TeklifTLm2 = secili.TeklifTLm2, GeriOdemeYil = secili.GeriOdeme, IndirimOrani = (double)indirim.Value / 100, YanitSuresiGun = (double)yanit.Value,
                 RakipTeklif = rakip.Checked, KabulOlasiligi = secili.KabulOlasiligi,
             };
-            try { d.Db.TeklifKaydet(t); d.TekliflerDegistiDuyur(); d.Bildir($"{t.TeklifNo} kaydedildi. Sonucu belli olunca Tekliflerim ekranında Kabul/Red işaretleyin."); }
+            try { d.Db.TeklifKaydet(t); d.TekliflerDegistiDuyur(); d.Bildir($"{t.TeklifNo} kaydedildi."); }
             catch (Exception e) { d.Hata("Kaydedilemedi: " + e.Message, e); Ui.Hata(this, "Kaydedilemedi: " + e.Message); }
         }
 
@@ -391,7 +391,7 @@ namespace EcoBuildss.UI
             Hesapla();
             var s = SonSonuc?.Tum.FirstOrDefault(x => x.Yalitim.Id == t.YalitimId && x.Cam.Id == t.CamId && x.Duvar.Id == t.DuvarId);
             if (s != null) Sec(paketler.FirstOrDefault(p => p.S.Kod == s.Kod) ?? PaketHesapla("Özel", s));
-            d.Bildir($"{t.TeklifNo} güncel fiyat ve iklim verisiyle yeniden hesaplandı (kayıttaki tutar: {Ui.Tl(t.TeklifTL)}).");
+            d.Bildir($"{t.TeklifNo} güncel fiyatlarla açıldı (kayıtlı: {Ui.Tl(t.TeklifTL)}).");
         }
 
         static decimal Sinirla(NumericUpDown n, double v) => Math.Max(n.Minimum, Math.Min(n.Maximum, (decimal)v));
@@ -408,7 +408,7 @@ namespace EcoBuildss.UI
                 Gerekce = TeklifRaporu.Gerekce(secili.S, r.Siralama, r, r.Siralama[0], paketler[0].S, paketler[2].S, SeciliOncelik), Ts825 = secili.S.Ts825Uygun ? "Uygun" : "Uygun değil",
             };
             var tumListe = r.Tum.Select(s => (s, r.Siralama.Any(x => x.Kod == s.Kod) ? (double?)(100 * s.Skor) : null)).ToList();
-            try { XlsxYazici.Yaz(f.FileName, TeklifRaporu.Excel(d.V, secili.S, r, paketler[0].S, bilgi, tumListe)); d.Bildir("Excel dosyası yazıldı: " + f.FileName); d.Db?.Gunluk("Teklif Excel'e aktarıldı", $"{secili.Ad} · {SeciliIl.Ad} · {Path.GetFileName(f.FileName)}"); }
+            try { XlsxYazici.Yaz(f.FileName, TeklifRaporu.Excel(d.V, secili.S, r, paketler[0].S, bilgi, tumListe)); d.Bildir("Kaydedildi: " + f.FileName); d.Db?.Gunluk("Teklif Excel'e aktarıldı", $"{secili.Ad} · {SeciliIl.Ad} · {Path.GetFileName(f.FileName)}"); }
             catch (Exception e) { d.Hata("Excel dosyası yazılamadı: " + e.Message, e); Ui.Hata(sahip, "Excel dosyası yazılamadı: " + e.Message); }
         }
 

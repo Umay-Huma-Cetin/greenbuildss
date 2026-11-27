@@ -1,5 +1,4 @@
 using System.Text;
-using EcoBuildss.Core.Sentetik;
 using EcoBuildss.Core.Veri;
 
 namespace EcoBuildss.UI
@@ -13,7 +12,6 @@ namespace EcoBuildss.UI
         readonly Durum d;
         readonly ComboBox veriSeti = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         readonly Label veriDurumu = new() { AutoSize = true, Font = Ui.Kalin, Margin = new Padding(0, 9, 12, 0) };
-        readonly Label aciklama = Ui.Aciklama("", 1100);
         readonly DataGridView onizleme = Ui.Izgara(), sema = Ui.Izgara();
         readonly ListBox bulgular = new() { Dock = DockStyle.Fill, Font = Ui.Kucuk, BorderStyle = BorderStyle.None, HorizontalScrollbar = true };
         readonly Label bulguOzet = new() { Dock = DockStyle.Top, Height = 22, Font = Ui.Kalin };
@@ -23,27 +21,25 @@ namespace EcoBuildss.UI
         public VeriSekmesi(Durum durum)
         {
             d = durum;
-            veriSeti.Items.AddRange(new object[] { "Tüketim kayıtları (faturalar) → kalibrasyon", "Teklif geçmişi (CRM) → kabul tahmini, segmentler" });
+            veriSeti.Items.AddRange(new object[] { "Tüketim kayıtları (faturalar)", "Teklif geçmişi" });
             veriSeti.SelectedIndex = 0;
 
             var ust = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8, 6, 8, 0), WrapContents = true };
             ust.Controls.Add(Ui.Etiket("Veri seti")); ust.Controls.Add(veriSeti); ust.Controls.Add(veriDurumu);
-            ust.Controls.Add(Ui.Dugme("Kendi dosyamı içe aktar (CSV)…", (_, __) => IceAktar(), true));
-            ust.Controls.Add(Ui.Dugme("Boş şablon kaydet…", (_, __) => Sablon()));
-            ust.Controls.Add(Ui.Dugme("Örnek (sentetik) veriyi yükle", (_, __) => Ornek()));
-            ust.Controls.Add(Ui.Dugme("Bu veri setini sil", (_, __) => Sil()));
-            var ac = new Panel { Dock = DockStyle.Top, Height = 40, Padding = new Padding(10, 0, 10, 0) }; ac.Controls.Add(aciklama); aciklama.Dock = DockStyle.Fill;
+            ust.Controls.Add(Ui.Dugme("İçe aktar", (_, __) => IceAktar(), true));
+            ust.Controls.Add(Ui.Dugme("Şablon", (_, __) => Sablon()));
+            ust.Controls.Add(Ui.Dugme("Sil", (_, __) => Sil()));
 
             var izgara = Ui.Izgara2(2, 62, 38);
-            izgara.Controls.Add(Ui.Kart("Kayıtlı veri (ilk 500 satır)", onizleme), 0, 0);
+            izgara.Controls.Add(Ui.Kart("Kayıtlar", onizleme), 0, 0);
             var sag = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2 };
             sag.RowStyles.Add(new RowStyle(SizeType.Percent, 55)); sag.RowStyles.Add(new RowStyle(SizeType.Percent, 45));
-            sag.Controls.Add(Ui.Kart("Beklenen sütunlar", sema, "Başlıklar büyük/küçük harf ve Türkçe karakterden bağımsız; ; ya da , ayırıcı; 1.234,5 ya da 1234.5"), 0, 0);
+            sag.Controls.Add(Ui.Kart("Sütunlar", sema), 0, 0);
             var bp = new Panel(); bp.Controls.Add(bulgular); bp.Controls.Add(bulguOzet);
-            sag.Controls.Add(Ui.Kart("Son içe aktarmanın denetim raporu", bp), 0, 1);
+            sag.Controls.Add(Ui.Kart("Denetim", bp), 0, 1);
             izgara.Controls.Add(sag, 1, 0);
 
-            Controls.Add(izgara); Controls.Add(ac); Controls.Add(ust);
+            Controls.Add(izgara); Controls.Add(ust);
             veriSeti.SelectedIndexChanged += (_, __) => Goster();
             d.TekliflerDegisti += Goster;
             Load += (_, __) => Goster();
@@ -52,7 +48,6 @@ namespace EcoBuildss.UI
         void Goster()
         {
             var s = Secili;
-            aciklama.Text = s.Aciklama + (veriSeti.SelectedIndex == 1 ? " Uygulamada kaydedip sonucunu Kabul/Red işaretlediğiniz teklifler de otomatik eklenir." : "");
             sema.Columns.Clear(); sema.Rows.Clear();
             foreach (var c in new[] { "Sütun", "Açıklama", "Biçim", "Zorunlu" }) sema.Columns.Add(c, c);
             sema.Columns[1].FillWeight = 180;
@@ -68,8 +63,8 @@ namespace EcoBuildss.UI
             onizleme.Columns.Clear(); onizleme.Rows.Clear();
             if (d.Db == null) { veriDurumu.Text = "Veritabanı kapalı"; return; }
             var (kayit, kaynak) = veriSeti.SelectedIndex == 0 ? d.Tuketim() : d.Teklifler();
-            veriDurumu.Text = kayit.Count == 0 ? "Henüz veri yok" : $"{Ui.Sayi(kayit.Count)} kayıt · {kaynak}";
-            veriDurumu.ForeColor = kaynak.StartsWith("Örnek") ? Color.FromArgb(160, 100, 20) : kayit.Count == 0 ? Ui.Soluk : Ui.Yesil;
+            veriDurumu.Text = kayit.Count == 0 ? "Veri yok" : $"{Ui.Sayi(kayit.Count)} kayıt";
+            veriDurumu.ForeColor = kayit.Count == 0 ? Ui.Soluk : Ui.Yesil;
             foreach (var a in s.Alanlar) onizleme.Columns.Add(a.Ad, a.Ad);
             foreach (var k in kayit.Take(500))
                 onizleme.Rows.Add(s.Alanlar.Select(a => k.Deger.TryGetValue(a.Ad, out var v) ? v switch
@@ -81,32 +76,21 @@ namespace EcoBuildss.UI
             if (d.Db == null) { Ui.Hata(this, "Veritabanı açılamadı: " + d.DbHatasi); return; }
             using var f = new OpenFileDialog { Filter = "CSV dosyası|*.csv;*.txt|Tüm dosyalar|*.*", Title = $"{Secili.Ad} dosyasını seçin" };
             if (f.ShowDialog(this) != DialogResult.OK) return;
-            Yukle(IceAktarici.Dosyadan(f.FileName, Secili), false, Path.GetFileName(f.FileName));
+            Yukle(IceAktarici.Dosyadan(f.FileName, Secili), Path.GetFileName(f.FileName));
         }
 
-        void Ornek()
-        {
-            if (d.Db == null) { Ui.Hata(this, "Veritabanı açılamadı: " + d.DbHatasi); return; }
-            if (MessageBox.Show(this, "Örnek veri SENTETİKTİR: gerçek il iklimi ve fiyatlarla hesaplanmış binalar üzerinde, davranış varsayımlarıyla üretilmiştir. " +
-                "Uygulamayı denemek içindir; karar için firmanızın gerçek verisini yükleyin.\n\nBu veri setindeki mevcut kayıtların yerine örnek veri yüklensin mi?",
-                "Örnek veri", MessageBoxButtons.OKCancel, MessageBoxIcon.Information) != DialogResult.OK) return;
-            string dosya = Path.Combine(d.Ornek, Secili.DosyaAdi);
-            string metin = File.Exists(dosya) ? File.ReadAllText(dosya, Encoding.UTF8)
-                         : veriSeti.SelectedIndex == 0 ? SentetikUretici.Tuketim(d.V) : SentetikUretici.Teklifler(d.V);
-            Yukle(IceAktarici.Metinden(metin, Secili), true, "örnek veri");
-        }
 
-        void Yukle(IceAktarmaSonucu s, bool ornek, string ad)
+        void Yukle(IceAktarmaSonucu s, string ad)
         {
             bulgular.Items.Clear();
             bulguOzet.Text = $"{ad}: {s.Ozet}";
             bulguOzet.ForeColor = s.DosyaGecersiz || s.Kayitlar.Count == 0 ? Ui.Kirmizi : s.Reddedilen > 0 ? Color.FromArgb(160, 100, 20) : Ui.Yesil;
             foreach (var b in s.Bulgular.Take(2000)) bulgular.Items.Add((b.Hata ? "✗ " : "• ") + b);
             if (s.DosyaGecersiz || s.Kayitlar.Count == 0) { d.Bildir("İçe aktarma yapılmadı: " + s.Ozet); return; }
-            if (s.Reddedilen > 0 && MessageBox.Show(this, $"{s.Reddedilen} satır hatalı olduğu için alınmayacak (ayrıntı sağdaki raporda). Geçerli {s.Kayitlar.Count} satır kaydedilsin mi?",
+            if (s.Reddedilen > 0 && MessageBox.Show(this, $"{s.Reddedilen} hatalı satır alınmayacak. {s.Kayitlar.Count} satır kaydedilsin mi?",
                     "Denetim", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-            d.Db!.VeriKaydet(Secili, s.Kayitlar, ornek);
-            d.Bildir($"{Secili.Ad}: {s.Kayitlar.Count} kayıt {(ornek ? "(örnek)" : "")} kaydedildi; modeller yeniden kuruluyor…");
+            d.Db!.VeriKaydet(Secili, s.Kayitlar, false);
+            d.Bildir($"{s.Kayitlar.Count} kayıt alındı.");
             Goster();
             d.ModelleriKur();
             d.VeriDegistiDuyur();
@@ -123,7 +107,7 @@ namespace EcoBuildss.UI
         void Sil()
         {
             if (d.Db == null) return;
-            if (MessageBox.Show(this, $"{Secili.Ad} veri setindeki bütün içe aktarılmış kayıtlar silinsin mi? (Kayıtlı teklifleriniz silinmez.)", "Sil", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+            if (MessageBox.Show(this, $"{Secili.Ad}: tüm kayıtlar silinsin mi?", "Sil", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
             d.Db.VeriSil(Secili); Goster(); d.ModelleriKur(); d.VeriDegistiDuyur();
         }
     }
