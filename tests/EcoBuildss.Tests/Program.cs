@@ -294,6 +294,10 @@ static class Testler
                 Dogrula(yasak && acamaz, "Satış rolü başkasının teklifini açamaz ve işaretleyemez");
                 yasak = false; try { db.KullaniciEkle("x123", "X", Rol.Yonetici, "Parola123"); } catch (UnauthorizedAccessException) { yasak = true; }
                 Dogrula(yasak, "Satış rolü kullanıcı ekleyemez");
+                yasak = false; try { db.Kullanicilar(); } catch (UnauthorizedAccessException) { yasak = true; }
+                Dogrula(yasak, "Satış rolü kullanıcı listesini göremez");
+                Dogrula(db.GirisYap("mehmet", "yanlis-parola9") == GirisSonucu.HataliBilgi && db.Aktif == null, "Başarısız yeni giriş önceki oturumu açık bırakmaz");
+                db.GirisYap("mehmet", "Kendi2026x");
                 db.OturumKapat();
                 for (int i = 0; i < Veritabani.AzamiHataliDeneme - 1; i++) db.GirisYap("mehmet", "yanlis" + i + "abc");
                 Dogrula(db.GirisYap("mehmet", "yanlis-son-1") == GirisSonucu.Kilitli, "5 hatalı denemede hesap kilitlenir");
