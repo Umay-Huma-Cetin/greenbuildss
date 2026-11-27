@@ -36,7 +36,7 @@ namespace EcoBuildss.UI
         readonly NumericUpDown katH = Sayi(2.4m, 6, 3, 2), camOrani = Sayi(0, 90, 20, 0), mevcutU = Sayi(0.3m, 3.5m, 1.78m, 2), yil = Sayi(5, 50, 20, 0),
             kar = Sayi(0, 100, 18, 0), indirim = Sayi(0, 60, 0, 1), yanit = Sayi(0, 365, 2, 0);
         readonly CheckBox klima = new() { Text = "Klima var", AutoSize = true }, rakip = new() { Text = "Rakip teklif var", AutoSize = true };
-        readonly NumericUpDown cevre = Sayi(0, 2000, 0, 1), taban = Sayi(0, 50000, 0, 0);
+        readonly NumericUpDown cevre = Sayi(0, 2000, 0, 1), taban = Sayi(0, 50000, 0, 0), penEn = Sayi(30, 400, 120, 0), penBoy = Sayi(30, 400, 150, 0);
         readonly Panel digerPanel = new() { AutoSize = true, Visible = false };
         readonly LinkLabel indirimLink = new() { Text = "İndirim", AutoSize = true, LinkColor = Ui.Yesil, Visible = false };
         readonly Label mevcutEtiket = Ui.Etiket("Mevcut duvar U (W/m²K)"), ilBilgi = Ui.Aciklama("", 240);
@@ -98,12 +98,12 @@ namespace EcoBuildss.UI
             sol.Controls.Add(ac);
             var dp = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0) };
             Alan(dp, "Müşteri / proje adı", musteri); Alan(dp, "Müşteri tipi", musteriTipi);
-            Alan(dp, "Kat yüksekliği (m)", katH); Alan(dp, "Plan çevresi (m)", cevre); Alan(dp, "Taban alanı (m²)", taban); Alan(dp, "Pencere / dış duvar oranı (%)", camOrani); Alan(dp, "Pencere doğraması", dograma);
+            Alan(dp, "Kat yüksekliği (m)", katH); Alan(dp, "Plan çevresi (m)", cevre); Alan(dp, "Taban alanı (m²)", taban); Alan(dp, "Pencere eni (cm)", penEn); Alan(dp, "Pencere boyu (cm)", penBoy); Alan(dp, "Pencere / dış duvar oranı (%)", camOrani); Alan(dp, "Pencere doğraması", dograma);
             Alan(dp, "Isıtma", yakit); dp.Controls.Add(klima);
             dp.Controls.Add(mevcutEtiket); dp.Controls.Add(mevcutU);
             Alan(dp, "Analiz süresi (yıl)", yil); Alan(dp, "Firma payı: işçilik + kâr (%)", kar); Alan(dp, "İndirim (%)", indirim);
             Alan(dp, "Talepten teklife geçen gün", yanit); dp.Controls.Add(rakip);
-            foreach (var c in new Control[] { cevre, taban, katH, camOrani, mevcutU, yil, kar, indirim, yanit }) c.Width = 120;
+            foreach (var c in new Control[] { cevre, taban, penEn, penBoy, katH, camOrani, mevcutU, yil, kar, indirim, yanit }) c.Width = 120;
             digerPanel.Controls.Add(dp);
             sol.Controls.Add(digerPanel);
 
@@ -160,7 +160,7 @@ namespace EcoBuildss.UI
             duzen.Controls.Add(sol, 0, 0); duzen.Controls.Add(orta, 1, 0);
             Controls.Add(duzen);
 
-            foreach (Control c in new Control[] { cevre, taban, musteriTipi, il, projeTuru, dograma, yakit, en, boy, kat, katH, camOrani, mevcutU, yil, kar, indirim, yanit, klima, rakip })
+            foreach (Control c in new Control[] { cevre, taban, penEn, penBoy, musteriTipi, il, projeTuru, dograma, yakit, en, boy, kat, katH, camOrani, mevcutU, yil, kar, indirim, yanit, klima, rakip })
                 switch (c)
                 {
                     case ComboBox cb: cb.SelectedIndexChanged += (_, __) => Degisti(); break;
@@ -188,7 +188,7 @@ namespace EcoBuildss.UI
             bool yen = (string)projeTuru.SelectedItem! == "Yenileme";
             var g = new Girdi
             {
-                Bina = BinaKur(), Il = SeciliIl, Bolge = SeciliIl.Ts825Bolge ?? 4,
+                Bina = BinaKur(), PencereEn = (double)penEn.Value / 100, PencereBoy = (double)penBoy.Value / 100, Il = SeciliIl, Bolge = SeciliIl.Ts825Bolge ?? 4,
                 CamOrani = (double)camOrani.Value / 100, Dograma = (string)dograma.SelectedItem!, Yakit = YakitKodu, Sogutma = klima.Checked, Mevcut = yen,
                 MevcutDuvarU = yen ? (double)mevcutU.Value : null, Yil = (int)yil.Value, SadeceTs825 = true,
                 Kalibrasyon = d.Kalibrasyon?.Kullanilabilir == true ? d.Kalibrasyon.IsitmaKatsayisi : 1,
@@ -413,7 +413,7 @@ namespace EcoBuildss.UI
             {
                 TeklifNo = d.Db.YeniTeklifNo(), Musteri = musteri.Text.Trim(), MusteriTipi = (string)musteriTipi.SelectedItem!, Il = SeciliIl.Ad, ProjeTuru = (string)projeTuru.SelectedItem!,
                 KullanimAlani = SonSonuc.KullanimAlani, Paket = secili.Ad, Oncelik = SeciliOncelik, YalitimId = secili.S.Yalitim.Id, CamId = secili.S.Cam.Id, DuvarId = secili.S.Duvar.Id,
-                Dograma = g.Dograma, Yakit = g.Yakit, En = (double)en.Value, Boy = (double)boy.Value, Cevre = b.En.HasValue ? 0 : (double)cevre.Value, Taban = b.En.HasValue ? 0 : (double)taban.Value, KatSayisi = b.KatSayisi, KatYuksekligi = (double)katH.Value, CamOrani = g.CamOrani, Sogutma = g.Sogutma,
+                Dograma = g.Dograma, Yakit = g.Yakit, En = (double)en.Value, Boy = (double)boy.Value, Cevre = b.En.HasValue ? 0 : (double)cevre.Value, Taban = b.En.HasValue ? 0 : (double)taban.Value, PencereEn = (double)penEn.Value / 100, PencereBoy = (double)penBoy.Value / 100, KatSayisi = b.KatSayisi, KatYuksekligi = (double)katH.Value, CamOrani = g.CamOrani, Sogutma = g.Sogutma,
                 TeklifTL = secili.TeklifTL, TeklifTLm2 = secili.TeklifTLm2, GeriOdemeYil = secili.GeriOdeme, IndirimOrani = (double)indirim.Value / 100, YanitSuresiGun = (double)yanit.Value,
                 RakipTeklif = rakip.Checked, KabulOlasiligi = secili.KabulOlasiligi,
             };
@@ -431,6 +431,7 @@ namespace EcoBuildss.UI
                 if (!oncelik.Any(r => r.Checked)) oncelik[1].Checked = true;
                 var i = il.Items.Cast<Il>().FirstOrDefault(x => x.Ad == t.Il); if (i != null) il.SelectedItem = i;
                 cevre.Value = Sinirla(cevre, t.Cevre); taban.Value = Sinirla(taban, t.Taban);
+                if (t.PencereEn > 0) { penEn.Value = Sinirla(penEn, t.PencereEn * 100); penBoy.Value = Sinirla(penBoy, t.PencereBoy * 100); }
                 if (t.En > 0) { en.Value = Sinirla(en, t.En); boy.Value = Sinirla(boy, t.Boy); kat.Value = Sinirla(kat, t.KatSayisi); katH.Value = Sinirla(katH, t.KatYuksekligi); }
                 camOrani.Value = Sinirla(camOrani, 100 * t.CamOrani); klima.Checked = t.Sogutma; rakip.Checked = t.RakipTeklif;
                 indirim.Value = Sinirla(indirim, 100 * t.IndirimOrani); yanit.Value = Sinirla(yanit, t.YanitSuresiGun);

@@ -139,7 +139,7 @@ dotnet run --project tests/EcoBuildss.Tests
 python araclar/dogrulama/bagimsiz_dogrulama.py <klasör>   # isteğe bağlı: pandas, scikit-learn
 ```
 
-117 test vardır ve şunları kapsar:
+118 test vardır ve şunları kapsar:
 - metrikler (F1, AUC, CV(RMSE))
 - regresyon ve gerçek levha fiyatları
 - enerji motoru ve yangın yönetmeliği kuralı
@@ -174,7 +174,7 @@ docs/                   Veri sözlüğü, ekran görüntüleri
 
 - Enerji modeli yıllık derece-gün yöntemidir. MGM derece-günü 15 °C eşikle hesaplandığı için ortalama güneş ve iç kazançlar denge sıcaklığında zaten vardır; cepheye göre güneş kazancı ayrıca hesaplanmaz (ikinci kez sayılmasın diye). Bina bazındaki sapmayı kalibrasyon gerçek tüketimle düzeltir.
 - Dikdörtgen olmayan planda (L, U, T) **Ayarlar**'dan plan çevresi ve taban alanı girilir; çizim yaklaşık gösterilir.
-- Pencere yangın bariyeri, pencere ölçüsü girilmediği için tipik 120 × 150 cm pencereyle hesaplanır (`parametreler.csv` B6–B7).
+- Pencere yangın bariyeri **Ayarlar**daki pencere eni ve boyuyla hesaplanır (varsayılan 120 × 150 cm, `parametreler.csv` B6–B7); pencere sayısı pencere alanından bulunur.
 - Kabul tahmininin F1 ≥ 0,87 sonucu test verisindedir. Gerçek veride model, eşiği geçmedikçe gösterilmez.
 - Referans fiyatlar dosyalardaki tarihlidir; güncel fiyat **Fiyatlar** sekmesinden girilir.
 
