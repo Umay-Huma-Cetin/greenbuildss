@@ -276,6 +276,7 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
         /// <summary>Giriş: 5 hatalı denemede hesap 15 dakika kilitlenir. Kullanıcı adının var olup olmadığı dışarıya belli edilmez.</summary>
         public GirisSonucu GirisYap(string kullaniciAdi, string parola)
         {
+            if (Aktif != null) OturumKapat("yeni giriş");   // önceki oturum ve veri anahtarı, giriş başarısız olsa da kalmaz
             var r = b.Sorgu("SELECT * FROM kullanicilar WHERE kullanici_adi = @k", new Dictionary<string, object?> { ["k"] = kullaniciAdi.Trim() });
             if (r.Count == 0)
             {
@@ -337,7 +338,7 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
         public void ParolaSifirla(long id, string yeni)
         {
             Yetki(yonetici: true, "Parola sıfırlama");
-            var k = Kullanicilar().First(x => x.Id == id);
+            var k = TumKullanicilar().First(x => x.Id == id);
             if (Parola.Kural(yeni, k.KullaniciAdi) is string m) throw new ArgumentException(m);
             b.Yaz("UPDATE kullanicilar SET parola = @p, hatali_deneme = 0, kilit_bitis = NULL, parola_degismeli = 1 WHERE id = @id", new Dictionary<string, object?> { ["p"] = Parola.Ozetle(yeni), ["id"] = id });
             AnahtarSar(k.KullaniciAdi, yeni);
@@ -347,14 +348,21 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
         public void KullaniciGuncelle(long id, Rol rol, bool aktif)
         {
             Yetki(yonetici: true, "Kullanıcı yetkisi değiştirme");
-            var k = Kullanicilar().First(x => x.Id == id);
-            bool sonYonetici = k.Yonetici && k.Aktif && Kullanicilar().Count(x => x.Yonetici && x.Aktif) == 1;
+            var k = TumKullanicilar().First(x => x.Id == id);
+            bool sonYonetici = k.Yonetici && k.Aktif && TumKullanicilar().Count(x => x.Yonetici && x.Aktif) == 1;
             if (sonYonetici && (rol != Rol.Yonetici || !aktif)) throw new InvalidOperationException("Sistemde en az bir etkin yönetici kalmalı.");
             b.Yaz("UPDATE kullanicilar SET rol = @r, aktif = @a WHERE id = @id", new Dictionary<string, object?> { ["r"] = rol == Rol.Yonetici ? "Yönetici" : "Satış", ["a"] = aktif, ["id"] = id });
             Gunluk("Kullanıcı güncellendi", $"{k.KullaniciAdi}: {(rol == Rol.Yonetici ? "Yönetici" : "Satış")}, {(aktif ? "etkin" : "devre dışı")}", Seviye.Guvenlik);
         }
 
-        public List<Kullanici> Kullanicilar() => b.Sorgu("SELECT * FROM kullanicilar ORDER BY ad_soyad").Select(Oku).ToList();
+        /// <summary>Kullanıcı listesi (yönetici).</summary>
+        public List<Kullanici> Kullanicilar()
+        {
+            Yetki(yonetici: true, "Kullanıcı listesini görüntüleme");
+            return TumKullanicilar();
+        }
+
+        List<Kullanici> TumKullanicilar() => b.Sorgu("SELECT * FROM kullanicilar ORDER BY ad_soyad").Select(Oku).ToList();
 
         static Kullanici Oku(Dictionary<string, object?> u) => new()
         {
@@ -419,7 +427,7 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
         /// <summary>Kurtarma anahtarıyla bir yöneticinin parolasını yeniler (parola unutulduğunda veriye erişimin tek yolu).</summary>
         public void KurtarmaIleSifirla(string kullaniciAdi, string kurtarmaAnahtari, string yeniParola)
         {
-            var k = Kullanicilar().FirstOrDefault(x => string.Equals(x.KullaniciAdi, kullaniciAdi.Trim(), StringComparison.OrdinalIgnoreCase));
+            var k = TumKullanicilar().FirstOrDefault(x => string.Equals(x.KullaniciAdi, kullaniciAdi.Trim(), StringComparison.OrdinalIgnoreCase));
             if (k == null || !k.Yonetici || !k.Aktif) { Gunluk("Kurtarma reddedildi", $"{kullaniciAdi.Trim()}: etkin yönetici değil", Seviye.Guvenlik); throw new ArgumentException("Kurtarma yalnız etkin bir yönetici hesabı için yapılabilir."); }
             if (Parola.Kural(yeniParola, k.KullaniciAdi) is string m) throw new ArgumentException(m);
             var acik = AnahtarAc("#kurtarma", Sifreleme.KurtarmaSade(kurtarmaAnahtari));
