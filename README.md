@@ -25,12 +25,49 @@ Geliştiren: **Umay Hüma Çetin**
 | ![Ana sayfa](docs/ekran/01_ana_sayfa.png) | ![Toplantı sayfası](docs/ekran/03_toplanti_sayfasi.png) |
 | ![Yeni bina](docs/ekran/04_yeni_bina.png) | ![Tekliflerim](docs/ekran/05_tekliflerim.png) |
 
+## Güvenlik ve işlem günlüğü
+
+**Kullanıcılar ve roller**
+- Program oturum açılmadan açılmaz. İlk çalıştırmada firmanın yönetici hesabı oluşturulur; diğer kullanıcıları yönetici ekler.
+- **Yönetici** her şeyi yapar. **Satış** teklif hazırlar, kaydeder ve sonucunu işaretler. Satış rolü teklif silemez, veri yükleyemez, kullanıcı ve ayar değiştiremez.
+- Yetki yalnız arayüzde değil, veritabanı katmanında da denetlenir. Yetkisiz istek reddedilir ve günlüğe yazılır.
+- Sistemde en az bir etkin yönetici kalması zorunludur.
+
+**Parolalar ve oturum**
+- Parolalar PBKDF2-HMAC-SHA256 ile saklanır: 600.000 tekrar, kullanıcıya özel tuz. Parolanın kendisi hiçbir yerde tutulmaz.
+- Parola kuralı: en az 8 karakter, harf ve rakam içermeli, kullanıcı adını içermemeli.
+- Yöneticinin verdiği geçici parola ilk girişte değiştirilmek zorundadır.
+- 5 hatalı denemede hesap 15 dakika kilitlenir. Kullanıcı adının var olup olmadığı giriş ekranında belli edilmez.
+- 15 dakika işlem yapılmazsa oturum kilitlenir.
+
+**İşlem günlüğü** (`islem_gunlugu` tablosu)
+- Şu işlemler kim yaptıysa onun adıyla, tarih ve seviyesiyle (Bilgi, Uyarı, Hata, Güvenlik) yazılır:
+  - program açılışı ve kapanışı
+  - oturum açma ve kapama, başarısız giriş, hesap kilitlenmesi
+  - teklif kaydı, silme, sonuç işaretleme, Excel'e aktarma, yazdırma
+  - veri yükleme ve silme
+  - ayar, kullanıcı ve parola değişiklikleri
+  - yedek alma ve geri yükleme
+  - hatalar
+- Her kayıt bir öncekinin SHA-256 özetini içerir. Kayıtlar böylece zincirlenir: biri sonradan değiştirilir ya da silinirse **Güvenlik ve yedek** sekmesindeki denetim bunu bulur.
+- Veritabanına yazılamayan hatalar ayrıca `%AppData%\EcoBuildss\hata.log` dosyasına yazılır.
+
+**Yedek**
+- Program her gün ilk açılışta otomatik yedek alır ve son 14 günün yedeğini saklar.
+- Yönetici istediği an yedek alabilir ve yedekten geri yükleyebilir. Geri yüklemeden önce mevcut durum ayrıca yedeklenir.
+- Yedekler SQLite'ın çevrimiçi yedekleme arayüzüyle alınır, yani tutarlıdır.
+
+**Sınır:** Veritabanı dosyası şifreli değildir; Windows'un kendi SQLite'ı şifrelemeyi desteklemez. Dosya, kullanıcının kendi `%AppData%` klasöründe Windows dosya izinleriyle korunur. Günlükteki değişiklikler zincir sayesinde fark edilir.
+
+![Güvenlik ve yedek](docs/ekran/08_guvenlik_ve_yedek.png)
+
 ## Kurulum
 
 Gerekenler: Windows 10/11 ve Visual Studio 2022 (.NET 8, “.NET masaüstü geliştirme” iş yükü).
 
 1. `EcoBuildss.sln` dosyasını açın.
 2. **F5** tuşuna basın. Başlangıç projesi `EcoBuildss.App`'tir.
+3. İlk açılışta yönetici hesabınızı oluşturun.
 
 Hiçbir NuGet paketi gerekmez. SQLite'a Windows'un kendi `winsqlite3.dll` dosyasıyla bağlanılır. `nuget.config` paket kaynaklarını kapatır, bu yüzden proje internetsiz de derlenir. Veritabanı `%AppData%\EcoBuildss\ecobuildss.db` dosyasıdır.
 
@@ -78,7 +115,7 @@ python araclar/dogrulama/bagimsiz_dogrulama.py          # isteğe bağlı: panda
 python araclar/dogrulama/bagimsiz_dogrulama.py <klasör> # kendi gerçek veriniz için
 ```
 
-55 test vardır ve şunları kapsar:
+81 test vardır ve şunları kapsar:
 - metrikler (F1, AUC, CV(RMSE))
 - regresyon ve gerçek levha fiyatları
 - enerji motoru ve yangın yönetmeliği kuralı
@@ -87,6 +124,7 @@ python araclar/dogrulama/bagimsiz_dogrulama.py <klasör> # kendi gerçek veriniz
 - az veride ve sinyalsiz veride kalite eşiğinin modeli reddetmesi
 - apartman hesabı (kapsam, faturadan tasarruf, taksit)
 - SQLite kaydı (parametreli sorgu)
+- güvenlik: parola özeti, kilitleme, roller, geçici parola, günlük zinciri ve değişiklik tespiti, yedek ve geri yükleme
 
 ## Klasörler
 

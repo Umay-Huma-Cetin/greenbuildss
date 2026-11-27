@@ -1,0 +1,330 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+
+namespace EcoBuildss.Core.Depo
+{
+    public enum Rol { Satis, Yonetici }
+    public enum Seviye { Bilgi, Uyari, Hata, Guvenlik }
+    public enum GirisSonucu { Basarili, HataliBilgi, Kilitli, Pasif }
+
+    public sealed class Kullanici
+    {
+        public long Id;
+        public string KullaniciAdi = "", AdSoyad = "";
+        public Rol Rol = Rol.Satis;
+        public bool Aktif = true;
+        public DateTime? SonGiris;
+        public bool ParolaDegismeli;   // yöneticinin verdiği geçici parola: ilk girişte değiştirilmeli
+        public bool Yonetici => Rol == Rol.Yonetici;
+        public string RolAdi => Rol == Rol.Yonetici ? "Yönetici" : "Satış";
+        public override string ToString() => $"{AdSoyad} ({RolAdi})";
+    }
+
+    public sealed class GunlukKaydi
+    {
+        public long Id; public DateTime Tarih; public string Kullanici = "", Seviye = "", Islem = "", Ayrinti = "";
+    }
+
+    /// <summary>
+    /// Parola saklama: PBKDF2-HMAC-SHA256, kullanıcıya özel 16 baytlık tuz, 600.000 tekrar (OWASP Parola Saklama Rehberi, 2023).
+    /// Parolanın kendisi hiçbir yerde tutulmaz; karşılaştırma sabit sürede yapılır.
+    /// </summary>
+    public static class Parola
+    {
+        public const int Tekrar = 600_000, TuzBayt = 16, OzetBayt = 32, EnAzUzunluk = 8;
+
+        public static string Ozetle(string parola, int tekrar = Tekrar)
+        {
+            var tuz = new byte[TuzBayt];
+            using (var r = RandomNumberGenerator.Create()) r.GetBytes(tuz);
+            return $"pbkdf2-sha256${tekrar}${Convert.ToBase64String(tuz)}${Convert.ToBase64String(Turet(parola, tuz, tekrar))}";
+        }
+
+        public static bool Dogrula(string parola, string kayit)
+        {
+            var p = kayit.Split('$');
+            if (p.Length != 4 || p[0] != "pbkdf2-sha256" || !int.TryParse(p[1], out int tekrar)) return false;
+            var beklenen = Convert.FromBase64String(p[3]);
+            var bulunan = Turet(parola, Convert.FromBase64String(p[2]), tekrar);
+            int fark = beklenen.Length ^ bulunan.Length;
+            for (int i = 0; i < Math.Min(beklenen.Length, bulunan.Length); i++) fark |= beklenen[i] ^ bulunan[i];   // sabit süreli karşılaştırma
+            return fark == 0;
+        }
+
+        static byte[] Turet(string parola, byte[] tuz, int tekrar)
+        {
+            using var k = new Rfc2898DeriveBytes(Encoding.UTF8.GetBytes(parola), tuz, tekrar, HashAlgorithmName.SHA256);
+            return k.GetBytes(OzetBayt);
+        }
+
+        /// <summary>Parola kuralı: en az 8 karakter, en az bir harf ve bir rakam. Uygunsa null, değilse neden.</summary>
+        public static string? Kural(string parola, string kullaniciAdi)
+        {
+            if (parola.Length < EnAzUzunluk) return $"Parola en az {EnAzUzunluk} karakter olmalı.";
+            if (!parola.Any(char.IsLetter) || !parola.Any(char.IsDigit)) return "Parolada en az bir harf ve bir rakam olmalı.";
+            if (kullaniciAdi.Length > 0 && parola.IndexOf(kullaniciAdi, StringComparison.OrdinalIgnoreCase) >= 0) return "Parola kullanıcı adını içermemeli.";
+            return null;
+        }
+    }
+
+    public sealed partial class Veritabani
+    {
+        public const int AzamiHataliDeneme = 5;
+        public static readonly TimeSpan KilitSuresi = TimeSpan.FromMinutes(15);
+        public const int YedekSaklamaGun = 14;
+
+        /// <summary>Oturum açmış kullanıcı. Oturum yokken veriyi değiştiren hiçbir işlem yapılamaz.</summary>
+        public Kullanici? Aktif { get; private set; }
+        public int KullaniciSayisi => (int)(long)b.Sorgu("SELECT COUNT(*) AS n FROM kullanicilar")[0]["n"]!;
+
+        void GuvenlikKur()
+        {
+            b.Calistir(@"
+CREATE TABLE IF NOT EXISTS kullanicilar (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, kullanici_adi TEXT NOT NULL UNIQUE COLLATE NOCASE, ad_soyad TEXT NOT NULL,
+  rol TEXT NOT NULL CHECK (rol IN ('Yönetici','Satış')), parola TEXT NOT NULL, aktif INTEGER NOT NULL DEFAULT 1,
+  hatali_deneme INTEGER NOT NULL DEFAULT 0, kilit_bitis TEXT, son_giris TEXT, olusturma TEXT NOT NULL)");
+            var sutun = b.Sorgu("PRAGMA table_info(islem_gunlugu)").Select(r => (string)r["name"]!).ToList();
+            if (!b.Sorgu("PRAGMA table_info(kullanicilar)").Any(r => (string?)r["name"] == "parola_degismeli"))
+                b.Calistir("ALTER TABLE kullanicilar ADD COLUMN parola_degismeli INTEGER NOT NULL DEFAULT 0");
+            if (!sutun.Contains("kullanici")) b.Calistir("ALTER TABLE islem_gunlugu ADD COLUMN kullanici TEXT NOT NULL DEFAULT ''");
+            if (!sutun.Contains("seviye")) b.Calistir("ALTER TABLE islem_gunlugu ADD COLUMN seviye TEXT NOT NULL DEFAULT 'Bilgi'");
+            if (!sutun.Contains("ozet"))
+            {
+                // Eski kayıtlar zincire bir kez bağlanır
+                b.Calistir("ALTER TABLE islem_gunlugu ADD COLUMN ozet TEXT NOT NULL DEFAULT ''");
+                string onceki = "";
+                foreach (var r in b.Sorgu("SELECT id, tarih, kullanici, seviye, islem, ayrinti FROM islem_gunlugu ORDER BY id"))
+                {
+                    onceki = ZincirOzeti(onceki, (long)r["id"]!, S(r["tarih"]), S(r["kullanici"]), S(r["seviye"]), S(r["islem"]), S(r["ayrinti"]));
+                    b.Yaz("UPDATE islem_gunlugu SET ozet = @o WHERE id = @id", new Dictionary<string, object?> { ["o"] = onceki, ["id"] = r["id"] });
+                }
+            }
+        }
+
+        // ======================= İşlem günlüğü (değiştirilemez zincir) =======================
+        /// <summary>
+        /// Her kayıt bir öncekinin özetini içeren SHA-256 özetiyle zincirlenir. Bir kayıt sonradan değiştirilir ya da silinirse
+        /// GunlukDogrula() zincirin koptuğu yeri gösterir.
+        /// </summary>
+        public void Gunluk(string islem, string ayrinti = "", Seviye seviye = Seviye.Bilgi)
+        {
+            string tarih = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
+            string kim = Aktif?.KullaniciAdi ?? "(oturum yok)", sev = SeviyeAdi(seviye);
+            b.Islem(() =>
+            {
+                var son = b.Sorgu("SELECT id, ozet FROM islem_gunlugu ORDER BY id DESC LIMIT 1");
+                string onceki = son.Count == 0 ? "" : S(son[0]["ozet"]);
+                long id = son.Count == 0 ? 1 : (long)son[0]["id"]! + 1;
+                string ozet = ZincirOzeti(onceki, id, tarih, kim, sev, islem, ayrinti);
+                b.Yaz("INSERT INTO islem_gunlugu (id, tarih, kullanici, seviye, islem, ayrinti, ozet) VALUES (@id, @t, @k, @s, @i, @a, @o)",
+                      new Dictionary<string, object?> { ["id"] = id, ["t"] = tarih, ["k"] = kim, ["s"] = sev, ["i"] = islem, ["a"] = ayrinti, ["o"] = ozet });
+            });
+        }
+
+        static string SeviyeAdi(Seviye s) => s switch { Seviye.Uyari => "Uyarı", Seviye.Hata => "Hata", Seviye.Guvenlik => "Güvenlik", _ => "Bilgi" };
+
+        static string ZincirOzeti(string onceki, long id, string tarih, string kim, string sev, string islem, string ayrinti)
+        {
+            using var h = SHA256.Create();
+            var b = h.ComputeHash(Encoding.UTF8.GetBytes(string.Join("\u001f", onceki, id.ToString(CultureInfo.InvariantCulture), tarih, kim, sev, islem, ayrinti)));
+            return BitConverter.ToString(b).Replace("-", "").ToLowerInvariant();
+        }
+
+        /// <summary>Günlük zincirini baştan doğrular. Bozuk kayıt yoksa null, varsa ilk bozuk kaydın sırası ve nedeni.</summary>
+        public (int kayit, string? sorun) GunlukDogrula()
+        {
+            string onceki = ""; long beklenenId = 0; int n = 0;
+            foreach (var r in b.Sorgu("SELECT id, tarih, kullanici, seviye, islem, ayrinti, ozet FROM islem_gunlugu ORDER BY id"))
+            {
+                n++;
+                long id = (long)r["id"]!;
+                if (beklenenId > 0 && id != beklenenId) return (n, $"#{beklenenId} numaralı kayıt silinmiş.");
+                string ozet = ZincirOzeti(onceki, id, S(r["tarih"]), S(r["kullanici"]), S(r["seviye"]), S(r["islem"]), S(r["ayrinti"]));
+                if (ozet != S(r["ozet"])) return (n, $"#{id} numaralı kayıt sonradan değiştirilmiş.");
+                onceki = ozet; beklenenId = id + 1;
+            }
+            return (n, null);
+        }
+
+        public List<GunlukKaydi> GunlukOku(int n = 500, Seviye? seviye = null)
+        {
+            Yetki(yonetici: true, "İşlem günlüğünü görüntüleme");
+            string kosul = seviye.HasValue ? "WHERE seviye = @s" : "";
+            return b.Sorgu($"SELECT id, tarih, kullanici, seviye, islem, ayrinti FROM islem_gunlugu {kosul} ORDER BY id DESC LIMIT {n}",
+                           new Dictionary<string, object?> { ["s"] = seviye.HasValue ? SeviyeAdi(seviye.Value) : null })
+                .Select(r => new GunlukKaydi
+                {
+                    Id = (long)r["id"]!, Tarih = DateTime.ParseExact(S(r["tarih"]).Length > 19 ? S(r["tarih"]).Substring(0, 19) : S(r["tarih"]), "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+                    Kullanici = S(r["kullanici"]), Seviye = S(r["seviye"]), Islem = S(r["islem"]), Ayrinti = S(r["ayrinti"]),
+                }).ToList();
+        }
+
+        // ======================= Yetki =======================
+        /// <summary>Oturum ve rol denetimi. Arayüz düğmeyi gizlese bile yetkisiz istek veritabanı katmanında reddedilir ve günlüğe yazılır.</summary>
+        void Yetki(bool yonetici, string islem)
+        {
+            if (Aktif == null) { Gunluk("Yetkisiz istek", $"{islem} (oturum yok)", Seviye.Guvenlik); throw new UnauthorizedAccessException("Bu işlem için oturum açmalısınız."); }
+            if (yonetici && !Aktif.Yonetici) { Gunluk("Yetkisiz istek", islem, Seviye.Guvenlik); throw new UnauthorizedAccessException($"{islem} yalnız yönetici yetkisiyle yapılabilir."); }
+        }
+
+        // ======================= Kullanıcılar ve oturum =======================
+        /// <summary>İlk kurulum: hiç kullanıcı yokken ilk yönetici oluşturulur ve oturumu açılır.</summary>
+        public Kullanici IlkYonetici(string kullaniciAdi, string adSoyad, string parola)
+        {
+            if (KullaniciSayisi > 0) throw new InvalidOperationException("İlk yönetici zaten oluşturulmuş.");
+            var k = Ekle(kullaniciAdi, adSoyad, Rol.Yonetici, parola);
+            Aktif = k;
+            Gunluk("İlk kurulum", $"Yönetici hesabı oluşturuldu: {k.KullaniciAdi}", Seviye.Guvenlik);
+            return k;
+        }
+
+        public Kullanici KullaniciEkle(string kullaniciAdi, string adSoyad, Rol rol, string parola)
+        {
+            Yetki(yonetici: true, "Kullanıcı ekleme");
+            var k = Ekle(kullaniciAdi, adSoyad, rol, parola);
+            b.Yaz("UPDATE kullanicilar SET parola_degismeli = 1 WHERE id = @id", new Dictionary<string, object?> { ["id"] = k.Id });
+            Gunluk("Kullanıcı eklendi", $"{k.KullaniciAdi} · {k.RolAdi}", Seviye.Guvenlik);
+            return k;
+        }
+
+        Kullanici Ekle(string kullaniciAdi, string adSoyad, Rol rol, string parola)
+        {
+            kullaniciAdi = kullaniciAdi.Trim(); adSoyad = adSoyad.Trim();
+            if (kullaniciAdi.Length < 3 || !kullaniciAdi.All(c => char.IsLetterOrDigit(c) || c == '.' || c == '_')) throw new ArgumentException("Kullanıcı adı en az 3 karakter olmalı; yalnız harf, rakam, nokta ve alt çizgi kullanılabilir.");
+            if (adSoyad.Length == 0) throw new ArgumentException("Ad soyad boş olamaz.");
+            if (Parola.Kural(parola, kullaniciAdi) is string k) throw new ArgumentException(k);
+            if (b.Sorgu("SELECT 1 FROM kullanicilar WHERE kullanici_adi = @k", new Dictionary<string, object?> { ["k"] = kullaniciAdi }).Count > 0) throw new ArgumentException("Bu kullanıcı adı kullanılıyor.");
+            long id = b.Yaz("INSERT INTO kullanicilar (kullanici_adi, ad_soyad, rol, parola, olusturma) VALUES (@k, @a, @r, @p, @o)", new Dictionary<string, object?>
+            { ["k"] = kullaniciAdi, ["a"] = adSoyad, ["r"] = rol == Rol.Yonetici ? "Yönetici" : "Satış", ["p"] = Parola.Ozetle(parola), ["o"] = DateTime.Now });
+            return new Kullanici { Id = id, KullaniciAdi = kullaniciAdi, AdSoyad = adSoyad, Rol = rol };
+        }
+
+        /// <summary>Giriş: 5 hatalı denemede hesap 15 dakika kilitlenir. Kullanıcı adının var olup olmadığı dışarıya belli edilmez.</summary>
+        public GirisSonucu GirisYap(string kullaniciAdi, string parola)
+        {
+            var r = b.Sorgu("SELECT * FROM kullanicilar WHERE kullanici_adi = @k", new Dictionary<string, object?> { ["k"] = kullaniciAdi.Trim() });
+            if (r.Count == 0)
+            {
+                Parola.Dogrula(parola, Parola.Ozetle("zamanlama-esitleme", 1000));   // var olmayan kullanıcıda da benzer süre
+                Gunluk("Başarısız giriş", $"bilinmeyen kullanıcı adı: {kullaniciAdi.Trim()}", Seviye.Guvenlik);
+                return GirisSonucu.HataliBilgi;
+            }
+            var u = r[0]; long id = (long)u["id"]!; string ad = S(u["kullanici_adi"]);
+            if ((long)u["aktif"]! == 0) { Gunluk("Başarısız giriş", $"{ad}: hesap devre dışı", Seviye.Guvenlik); return GirisSonucu.Pasif; }
+            if (u["kilit_bitis"] is string kb && DateTime.ParseExact(kb, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) > DateTime.Now)
+            { Gunluk("Başarısız giriş", $"{ad}: hesap kilitli", Seviye.Guvenlik); return GirisSonucu.Kilitli; }
+            if (!Parola.Dogrula(parola, S(u["parola"])))
+            {
+                long deneme = (long)u["hatali_deneme"]! + 1;
+                bool kilit = deneme >= AzamiHataliDeneme;
+                b.Yaz("UPDATE kullanicilar SET hatali_deneme = @d, kilit_bitis = @kb WHERE id = @id", new Dictionary<string, object?>
+                { ["d"] = kilit ? 0 : deneme, ["kb"] = kilit ? DateTime.Now.Add(KilitSuresi) : null, ["id"] = id });
+                Gunluk("Başarısız giriş", kilit ? $"{ad}: {AzamiHataliDeneme} hatalı deneme, hesap {KilitSuresi.TotalMinutes:0} dakika kilitlendi" : $"{ad}: hatalı parola ({deneme}/{AzamiHataliDeneme})", Seviye.Guvenlik);
+                return kilit ? GirisSonucu.Kilitli : GirisSonucu.HataliBilgi;
+            }
+            b.Yaz("UPDATE kullanicilar SET hatali_deneme = 0, kilit_bitis = NULL, son_giris = @t WHERE id = @id", new Dictionary<string, object?> { ["t"] = DateTime.Now, ["id"] = id });
+            Aktif = Oku(u);
+            Gunluk("Oturum açıldı", $"{Aktif.KullaniciAdi} · {Aktif.RolAdi}", Seviye.Guvenlik);
+            return GirisSonucu.Basarili;
+        }
+
+        public void OturumKapat(string neden = "çıkış")
+        {
+            if (Aktif == null) return;
+            Gunluk("Oturum kapandı", $"{Aktif.KullaniciAdi} · {neden}", Seviye.Guvenlik);
+            Aktif = null;
+        }
+
+        public void ParolaDegistir(string eski, string yeni)
+        {
+            Yetki(yonetici: false, "Parola değiştirme");
+            var u = b.Sorgu("SELECT parola FROM kullanicilar WHERE id = @id", new Dictionary<string, object?> { ["id"] = Aktif!.Id })[0];
+            if (!Parola.Dogrula(eski, S(u["parola"]))) { Gunluk("Parola değiştirilemedi", $"{Aktif.KullaniciAdi}: eski parola hatalı", Seviye.Guvenlik); throw new ArgumentException("Mevcut parola hatalı."); }
+            if (Parola.Kural(yeni, Aktif.KullaniciAdi) is string k) throw new ArgumentException(k);
+            b.Yaz("UPDATE kullanicilar SET parola = @p, parola_degismeli = 0 WHERE id = @id", new Dictionary<string, object?> { ["p"] = Parola.Ozetle(yeni), ["id"] = Aktif.Id });
+            Aktif.ParolaDegismeli = false;
+            Gunluk("Parola değiştirildi", Aktif.KullaniciAdi, Seviye.Guvenlik);
+        }
+
+        public void ParolaSifirla(long id, string yeni)
+        {
+            Yetki(yonetici: true, "Parola sıfırlama");
+            var k = Kullanicilar().First(x => x.Id == id);
+            if (Parola.Kural(yeni, k.KullaniciAdi) is string m) throw new ArgumentException(m);
+            b.Yaz("UPDATE kullanicilar SET parola = @p, hatali_deneme = 0, kilit_bitis = NULL, parola_degismeli = 1 WHERE id = @id", new Dictionary<string, object?> { ["p"] = Parola.Ozetle(yeni), ["id"] = id });
+            Gunluk("Parola sıfırlandı", k.KullaniciAdi, Seviye.Guvenlik);
+        }
+
+        public void KullaniciGuncelle(long id, Rol rol, bool aktif)
+        {
+            Yetki(yonetici: true, "Kullanıcı yetkisi değiştirme");
+            var k = Kullanicilar().First(x => x.Id == id);
+            bool sonYonetici = k.Yonetici && k.Aktif && Kullanicilar().Count(x => x.Yonetici && x.Aktif) == 1;
+            if (sonYonetici && (rol != Rol.Yonetici || !aktif)) throw new InvalidOperationException("Sistemde en az bir etkin yönetici kalmalı.");
+            b.Yaz("UPDATE kullanicilar SET rol = @r, aktif = @a WHERE id = @id", new Dictionary<string, object?> { ["r"] = rol == Rol.Yonetici ? "Yönetici" : "Satış", ["a"] = aktif, ["id"] = id });
+            Gunluk("Kullanıcı güncellendi", $"{k.KullaniciAdi}: {(rol == Rol.Yonetici ? "Yönetici" : "Satış")}, {(aktif ? "etkin" : "devre dışı")}", Seviye.Guvenlik);
+        }
+
+        public List<Kullanici> Kullanicilar() => b.Sorgu("SELECT * FROM kullanicilar ORDER BY ad_soyad").Select(Oku).ToList();
+
+        static Kullanici Oku(Dictionary<string, object?> u) => new()
+        {
+            Id = (long)u["id"]!, KullaniciAdi = S(u["kullanici_adi"]), AdSoyad = S(u["ad_soyad"]), Rol = S(u["rol"]) == "Yönetici" ? Rol.Yonetici : Rol.Satis,
+            Aktif = (long)u["aktif"]! == 1, ParolaDegismeli = u.TryGetValue("parola_degismeli", out var pd) && pd is long l && l == 1, SonGiris = u["son_giris"] is string sg ? DateTime.ParseExact(sg, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) : null,
+        };
+
+        // ======================= Yedekleme =======================
+        public string YedekKlasoru => Path.Combine(Path.GetDirectoryName(Dosya)!, "yedek");
+
+        /// <summary>Elle yedek (yönetici). Tutarlı kopya, veritabanı açıkken alınır.</summary>
+        public string Yedekle()
+        {
+            Yetki(yonetici: true, "Yedek alma");
+            return YedekAl("elle");
+        }
+
+        /// <summary>Günlük otomatik yedek: bugün yedek alınmadıysa alır, 14 günden eski otomatik yedekleri siler.</summary>
+        public string? OtomatikYedek()
+        {
+            Directory.CreateDirectory(YedekKlasoru);
+            string bugun = $"ecobuildss_{DateTime.Today:yyyyMMdd}_otomatik.db";
+            if (File.Exists(Path.Combine(YedekKlasoru, bugun))) return null;
+            string yol = YedekAl("otomatik", bugun);
+            foreach (var f in Directory.GetFiles(YedekKlasoru, "ecobuildss_*_otomatik.db").Where(f => File.GetCreationTime(f) < DateTime.Today.AddDays(-YedekSaklamaGun)))
+                try { File.Delete(f); } catch { }
+            return yol;
+        }
+
+        string YedekAl(string tur, string? ad = null)
+        {
+            Directory.CreateDirectory(YedekKlasoru);
+            string yol = Path.Combine(YedekKlasoru, ad ?? $"ecobuildss_{DateTime.Now:yyyyMMdd_HHmmss}_{tur}.db");
+            b.Yedekle(yol);
+            Gunluk("Yedek alındı", $"{tur}: {Path.GetFileName(yol)} ({new FileInfo(yol).Length / 1024} KB)");
+            return yol;
+        }
+
+        public List<FileInfo> Yedekler() => Directory.Exists(YedekKlasoru)
+            ? new DirectoryInfo(YedekKlasoru).GetFiles("ecobuildss_*.db").OrderByDescending(f => f.LastWriteTime).ToList() : new List<FileInfo>();
+
+        /// <summary>Yedekten geri yükleme (yönetici). Önce mevcut durumun yedeği alınır; geri yüklenen dosyanın günlük zinciri doğrulanır.</summary>
+        public void GeriYukle(string yedekDosyasi)
+        {
+            Yetki(yonetici: true, "Yedekten geri yükleme");
+            var kim = Aktif!;
+            using (var kontrol = new SqliteBaglanti(yedekDosyasi, pragmasiz: true))
+                if (kontrol.Sorgu("SELECT name FROM sqlite_master WHERE type='table' AND name='teklifler'").Count == 0) throw new InvalidDataException("Seçilen dosya bir EcoBuildss yedeği değil.");
+            string onceki = YedekAl("geri-yukleme-oncesi");
+            b.Yedekle(yedekDosyasi, geriYukle: true);
+            GuvenlikKur();
+            Aktif = Kullanicilar().FirstOrDefault(x => x.KullaniciAdi == kim.KullaniciAdi && x.Aktif) ?? kim;
+            Gunluk("Yedekten geri yüklendi", $"{Path.GetFileName(yedekDosyasi)} · önceki durum: {Path.GetFileName(onceki)}", Seviye.Guvenlik);
+        }
+    }
+}

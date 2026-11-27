@@ -212,6 +212,9 @@ static class Testler
             using (var db = new Veritabani(dosya))
             {
                 var sema = Semalar.Teklif(v);
+                bool red = false; try { db.VeriKaydet(sema, tek.Kayitlar, ornek: true); } catch (UnauthorizedAccessException) { red = true; }
+                Dogrula(red, "Oturum açılmadan veri yazılamaz");
+                db.IlkYonetici("ayse", "Ayşe Çetin", "Gizli2026!");
                 db.VeriKaydet(sema, tek.Kayitlar, ornek: true);
                 var (geri, kaynak) = db.VeriOku(sema);
                 Dogrula(geri.Kayitlar.Count == 800 && geri.Reddedilen == 0 && kaynak == "Örnek", "Veri kaydedilip aynen okunur", geri.Ozet);
@@ -225,8 +228,58 @@ static class Testler
                 Dogrula(l.Count == 1 && l[0].Sonuc == "Kabul" && l[0].Musteri == t.Musteri, "Teklif kaydı ve sonuç (parametreli SQL)");
                 var csv = IceAktarici.Metinden(db.SonuclananTekliflerCsv(sema), sema);
                 Dogrula(csv.Kayitlar.Count == 1 && csv.Reddedilen == 0, "Sonuçlanan teklifler eğitim verisine dönüşür", csv.Ozet);
+                Dogrula(l[0].Hazirlayan == "ayse", "Teklifi kimin hazırladığı kaydedilir");
+
+                // ---- Güvenlik ----
+                Bolum("Güvenlik ve işlem günlüğü");
+                string ozet = Parola.Ozetle("Deneme123", 1000);
+                Dogrula(Parola.Dogrula("Deneme123", ozet) && !Parola.Dogrula("deneme123", ozet), "Parola doğrulama (büyük/küçük harf duyarlı)");
+                Dogrula(!ozet.Contains("Deneme123") && ozet.StartsWith("pbkdf2-sha256$1000$"), "Parola açık metin saklanmaz (PBKDF2-SHA256)");
+                Dogrula(Parola.Ozetle("Deneme123", 1000) != ozet, "Her parola özeti farklı tuzla üretilir");
+                Dogrula(Parola.Kural("kisa1", "x") != null && Parola.Kural("sadeceharf", "x") != null && Parola.Kural("ayse2026x", "ayse") != null && Parola.Kural("Guvenli99", "ayse") == null, "Parola kuralı");
+                var satis = db.KullaniciEkle("mehmet", "Mehmet Yılmaz", Rol.Satis, "Satis2026!");
+                db.OturumKapat();
+                Dogrula(db.GirisYap("mehmet", "yanlis-parola1") == GirisSonucu.HataliBilgi, "Hatalı parola reddedilir");
+                Dogrula(db.GirisYap("olmayan", "Herhangi123") == GirisSonucu.HataliBilgi, "Bilinmeyen kullanıcı aynı yanıtı alır");
+                Dogrula(db.GirisYap("MEHMET", "Satis2026!") == GirisSonucu.Basarili && db.Aktif!.Rol == Rol.Satis, "Kullanıcı adı büyük/küçük harften bağımsız, rol yüklenir");
+                Dogrula(db.Aktif!.ParolaDegismeli, "Yöneticinin verdiği geçici parola ilk girişte değiştirilmeli");
+                db.ParolaDegistir("Satis2026!", "Kendi2026x"); db.OturumKapat();
+                Dogrula(db.GirisYap("mehmet", "Kendi2026x") == GirisSonucu.Basarili && !db.Aktif!.ParolaDegismeli, "Parola değişince zorunluluk kalkar");
+                bool yasak = false; try { db.TeklifSil(t.Id); } catch (UnauthorizedAccessException) { yasak = true; }
+                Dogrula(yasak && db.Teklifler().Count == 1, "Satış rolü teklif silemez");
+                yasak = false; try { db.KullaniciEkle("x123", "X", Rol.Yonetici, "Parola123"); } catch (UnauthorizedAccessException) { yasak = true; }
+                Dogrula(yasak, "Satış rolü kullanıcı ekleyemez");
+                db.OturumKapat();
+                for (int i = 0; i < Veritabani.AzamiHataliDeneme - 1; i++) db.GirisYap("mehmet", "yanlis" + i + "abc");
+                Dogrula(db.GirisYap("mehmet", "yanlis-son-1") == GirisSonucu.Kilitli, "5 hatalı denemede hesap kilitlenir");
+                Dogrula(db.GirisYap("mehmet", "Kendi2026x") == GirisSonucu.Kilitli, "Kilitliyken doğru parola da kabul edilmez");
+                Dogrula(db.GirisYap("ayse", "Gizli2026!") == GirisSonucu.Basarili, "Yönetici girişi");
+                yasak = false; try { db.KullaniciGuncelle(db.Aktif!.Id, Rol.Satis, true); } catch (InvalidOperationException) { yasak = true; }
+                Dogrula(yasak, "Son yönetici yetkisi kaldırılamaz");
+                db.ParolaSifirla(satis.Id, "YeniParola7");
+                Dogrula(db.GunlukOku().Any(g => g.Islem == "Başarısız giriş" && g.Seviye == "Güvenlik") && db.GunlukOku().Any(g => g.Islem == "Yetkisiz istek"), "Başarısız giriş ve yetkisiz istek günlüğe yazılır");
+                Dogrula(db.GunlukOku().Any(g => g.Islem == "Teklif kaydedildi" && g.Kullanici == "ayse"), "Günlükte işlemi yapan kullanıcı var");
+                var (n, sorun) = db.GunlukDogrula();
+                Dogrula(sorun == null && n > 10, "Günlük zinciri sağlam", sorun ?? "");
+                // Yedek
+                string yedek = db.Yedekle();
+                Dogrula(File.Exists(yedek), "Elle yedek alınır");
+                db.TeklifKaydet(new KayitliTeklif { TeklifNo = db.YeniTeklifNo(), Il = "Malatya", KullanimAlani = 100, TeklifTL = 1, TeklifTLm2 = 1 });
+                Dogrula(db.Teklifler().Count == 2, "Yedekten sonra yeni teklif");
+                db.GeriYukle(yedek);
+                Dogrula(db.Teklifler().Count == 1 && db.Aktif?.KullaniciAdi == "ayse", "Yedekten geri yükleme");
+                Dogrula(db.Yedekler().Count >= 2, "Geri yüklemeden önce mevcut durum yedeklenir");
+                Dogrula(db.OtomatikYedek() != null && db.OtomatikYedek() == null, "Otomatik yedek günde bir kez alınır");
+            }
+            // Günlük sonradan değiştirilirse zincir bozulur
+            using (var ham = new SqliteBaglanti(dosya)) ham.Yaz("UPDATE islem_gunlugu SET ayrinti = 'değiştirildi' WHERE id = 3");
+            using (var db = new Veritabani(dosya))
+            {
+                var (_, sorun) = db.GunlukDogrula();
+                Dogrula(sorun != null && sorun.Contains("#3"), "Günlükte değiştirilen kayıt tespit edilir", sorun ?? "bulunamadı");
             }
             foreach (var f in Directory.GetFiles(Path.GetTempPath(), Path.GetFileName(dosya) + "*")) File.Delete(f);
+            if (Directory.Exists(Path.Combine(Path.GetTempPath(), "yedek"))) Directory.Delete(Path.Combine(Path.GetTempPath(), "yedek"), true);
         }
 
         Console.WriteLine($"\n{gecen} test geçti, {kalan} test kaldı · {sw.Elapsed.TotalSeconds:0.0} sn");

@@ -22,6 +22,29 @@ namespace EcoBuildss.UI
         public event Action<string>? Bildirim;
 
         public void Bildir(string m) => Bildirim?.Invoke(m);
+
+        public Kullanici? Kullanici => Db?.Aktif;
+        public bool Yonetici => Db?.Aktif?.Yonetici == true;
+
+        /// <summary>Hata: kullanıcıya gösterilir, işlem günlüğüne "Hata" seviyesinde ve yedek olarak hata.log dosyasına yazılır.</summary>
+        public void Hata(string mesaj, Exception? e = null)
+        {
+            Bildir(mesaj);
+            HataDosyasina(mesaj, e);
+            try { Db?.Gunluk("Hata", mesaj + (e != null ? $" [{e.GetType().Name}]" : ""), Seviye.Hata); } catch { }
+        }
+
+        /// <summary>Veritabanına yazılamasa bile hatalar kaybolmasın diye düz metin dosyası.</summary>
+        public static void HataDosyasina(string mesaj, Exception? e = null)
+        {
+            try
+            {
+                string k = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EcoBuildss");
+                Directory.CreateDirectory(k);
+                File.AppendAllText(Path.Combine(k, "hata.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}\t{mesaj}{(e != null ? "\t" + e : "")}{Environment.NewLine}");
+            }
+            catch { }
+        }
         public void VeriDegistiDuyur() => VeriDegisti?.Invoke();
         public void ModellerDegistiDuyur() => ModellerDegisti?.Invoke();
         public void TekliflerDegistiDuyur() => TekliflerDegisti?.Invoke();
@@ -61,11 +84,11 @@ namespace EcoBuildss.UI
             var (t, tk) = Tuketim();
             if (t.Count >= KalibrasyonSonucu.MinKayit)
                 try { Kalibrasyon = Core.Uygulamalar.Kalibrasyon.Calistir(V, t); Db?.ModelKaydet("Kalibrasyon (regresyon)", tk, t.Count, Kalibrasyon.Yorum); }
-                catch (Exception e) { Bildir("Kalibrasyon kurulamadı: " + e.Message); }
+                catch (Exception e) { Hata("Kalibrasyon kurulamadı: " + e.Message, e); }
             var (k, kk) = Teklifler();
             if (k.Count >= 20)
                 try { Kabul = KabulTahmini.Egit(V, k); Db?.ModelKaydet("Kabul tahmini (sınıflandırma)", kk, k.Count, Kabul.Yorum); }
-                catch (Exception e) { Bildir("Kabul modeli kurulamadı: " + e.Message); }
+                catch (Exception e) { Hata("Kabul modeli kurulamadı: " + e.Message, e); }
             ModellerDegistiDuyur();
         }
 

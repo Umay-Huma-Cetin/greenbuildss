@@ -159,7 +159,7 @@ namespace EcoBuildss.UI
                 paketler = new() { ("Ekonomik", eko, A(eko)), ("Önerilen", r.Siralama[0], A(r.Siralama[0])), ("En yüksek tasarruf", yuk, A(yuk)) };
                 Goster();
             }
-            catch (Exception e) { d.Bildir("Hesap yapılamadı: " + e.Message); }
+            catch (Exception e) { d.Hata("Hesap yapılamadı: " + e.Message, e); }
         }
 
         void Goster()
@@ -201,7 +201,7 @@ namespace EcoBuildss.UI
                 t.KabulOlasiligi = d.Kabul.Olasilik(new Core.Uygulamalar.TeklifOzellik { Il = t.Il, MusteriTipi = t.MusteriTipi, ProjeTuru = t.ProjeTuru, Paket = t.Paket, Oncelik = t.Oncelik,
                     KullanimAlani = t.KullanimAlani, TeklifTLm2 = t.TeklifTLm2, IndirimOrani = t.IndirimOrani, GeriOdemeYil = t.GeriOdemeYil }, d.V);
             try { d.Db.TeklifKaydet(t); d.TekliflerDegistiDuyur(); d.Bildir($"{t.TeklifNo} kaydedildi ({ad.Text}). Toplantıdan sonra Tekliflerim ekranında sonucu işaretleyin."); }
-            catch (Exception e) { Ui.Hata(this, "Kaydedilemedi: " + e.Message); }
+            catch (Exception e) { d.Hata("Kaydedilemedi: " + e.Message, e); Ui.Hata(this, "Kaydedilemedi: " + e.Message); }
         }
 
         public void Yukle(KayitliTeklif t)
@@ -231,6 +231,7 @@ namespace EcoBuildss.UI
             string firma = d.Db?.Ayar("firma_adi", "") ?? "", tel = d.Db?.Ayar("firma_telefon", "") ?? "";
             var belge = new PrintDocument { DocumentName = "EcoBuildss toplantı sayfası" };
             belge.PrintPage += (_, e) => SayfaCiz(e.Graphics!, e.MarginBounds);
+            belge.EndPrint += (_, e) => { if (e.PrintAction == PrintAction.PrintToPrinter) d.Db?.Gunluk("Toplantı sayfası yazdırıldı", $"{ad.Text} · {SeciliIl.Ad} · {Ui.Tl(a.DaireBasiTL)}/daire"); };
             using var o = new PrintPreviewDialog { Document = belge, Width = 900, Height = 1000 };
             o.ShowDialog(this);
         }
