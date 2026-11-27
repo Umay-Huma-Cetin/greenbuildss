@@ -352,6 +352,16 @@ static class Testler
                 db.FiyatSil("Y2");
                 var t2 = db.Teklifler().First(x => x.Il == "Malatya" && x.TeklifTL == 1);
                 Dogrula(t2.KullanimAlani == 100 && t2.Hazirlayan == "umay", "Şifreli teklif ayrıntıları eksiksiz geri okunur");
+                var tg = new KayitliTeklif { TeklifNo = db.YeniTeklifNo(), Il = "Malatya", ProjeTuru = "Yenileme", KullanimAlani = 900, TeklifTL = 5, TeklifTLm2 = 1, SozAzalma = 0.38,
+                                             DestekDaire = 7500, YapimDonemi = "2001 öncesi", PencereEn = 1.4, PencereBoy = 1.6, Cevre = 70, Taban = 280 };
+                db.TeklifKaydet(tg);
+                bool erken = false; try { db.GerceklesenKaydet(tg.Id, 1000, 650); } catch (InvalidOperationException) { erken = true; }
+                db.SonucIsaretle(tg.Id, "Kabul"); db.GerceklesenKaydet(tg.Id, 1000, 650);
+                var tg2 = db.Teklifler().First(x => x.Id == tg.Id);
+                Dogrula(erken && tg2.SozAzalma == 0.38 && tg2.DestekDaire == 7500 && tg2.YapimDonemi == "2001 öncesi" && tg2.PencereEn == 1.4 && tg2.Taban == 280 && tg2.GercekSonraM3 == 650
+                        && Math.Abs(Gerceklesen.Fark(tg2.SozAzalma, tg2.GercekOnceM3, tg2.GercekSonraM3) - (-0.03)) < 1e-9,
+                        "Gerçekleşen tüketim yalnız kabul edilen işte; tüm teklif alanları şifreli saklanıp geri okunur");
+                db.TeklifSil(tg.Id);
                 string sonNo = db.YeniTeklifNo(); db.TeklifSil(db.Teklifler().OrderBy(x => x.TeklifNo).First().Id);
                 Dogrula(db.YeniTeklifNo() == sonNo, "Teklif silinse de yeni numara çakışmaz");
                 db.GeriYukle(yedek);

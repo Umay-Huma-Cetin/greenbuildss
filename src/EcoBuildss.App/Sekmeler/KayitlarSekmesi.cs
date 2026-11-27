@@ -35,6 +35,7 @@ namespace EcoBuildss.UI
             ust.Controls.Add(Ui.Dugme("Aç", (_, __) => { if (Secili() is KayitliTeklif t) Ac(t); }));
             silDugmesi = Ui.Dugme("Sil", (_, __) => Sil());
             ust.Controls.Add(silDugmesi);
+            ust.Controls.Add(Ui.Dugme("Gerçekleşen", (_, __) => { if (Secili() is KayitliTeklif t) GerceklesenGir(t); }));
             satisciDugmesi = Ui.Dugme("Satışçılar", (_, __) => Satiscilar());
             ust.Controls.Add(satisciDugmesi);
             ust.Controls.Add(ozet);
@@ -61,14 +62,15 @@ namespace EcoBuildss.UI
         {
             liste.Columns.Clear(); liste.Rows.Clear();
             if (d.Db == null) { ozet.Text = "Veritabanı açılamadı: " + d.DbHatasi; return; }
-            foreach (var c in new[] { "Teklif no", "Tarih", "Müşteri / apartman", "Tip", "İl", "İş", "Alan (m²)", "Paket", "Teklif (KDV hariç)", "TL/m²", "Geri ödeme", "Kazanma olasılığı", "Sonuç", "Hazırlayan", "Takip" }) liste.Columns.Add(c, c);
+            foreach (var c in new[] { "Teklif no", "Tarih", "Müşteri / apartman", "Tip", "İl", "İş", "Alan (m²)", "Paket", "Teklif (KDV hariç)", "TL/m²", "Geri ödeme", "Kazanma olasılığı", "Sonuç", "Hazırlayan", "Takip", "Gerçekleşen" }) liste.Columns.Add(c, c);
             var l = d.Db.Teklifler();
             foreach (var t in l)
             {
                 int i = liste.Rows.Add(t.TeklifNo, t.Tarih.ToString("dd.MM.yyyy"), t.Musteri, t.MusteriTipi, t.Il, t.ProjeTuru == "Yenileme" ? (t.DaireSayisi > 0 ? $"Mantolama · {t.DaireSayisi} daire" : "Mantolama") : "Yeni bina", Ui.Sayi(t.KullanimAlani), t.Paket, Ui.Tl(t.TeklifTL),
                                        Ui.Sayi(t.TeklifTLm2), t.GeriOdemeYil.HasValue ? Ui.Sayi(t.GeriOdemeYil.Value, "0.0") + " yıl" : "—",
                                        t.KabulOlasiligi.HasValue ? Ui.Olasilik(t.KabulOlasiligi.Value) : "—", t.Sonuc, t.Hazirlayan,
-                                       t.Sonuc != "Bekliyor" ? "" : TeklifTakibi.TakipGerekli(t, DateTime.Today) ? $"{TeklifTakibi.BeklemeGunu(t, DateTime.Today)} gün · ara" : $"{TeklifTakibi.BeklemeGunu(t, DateTime.Today)} gün");
+                                       t.Sonuc != "Bekliyor" ? "" : TeklifTakibi.TakipGerekli(t, DateTime.Today) ? $"{TeklifTakibi.BeklemeGunu(t, DateTime.Today)} gün · ara" : $"{TeklifTakibi.BeklemeGunu(t, DateTime.Today)} gün",
+                                       t.GercekOnceM3 > 0 ? $"−%{100 * Gerceklesen.Azalma(t.GercekOnceM3, t.GercekSonraM3):0} (söz −%{100 * t.SozAzalma:0})" : "");
                 liste.Rows[i].Tag = t;
                 if (TeklifTakibi.TakipGerekli(t, DateTime.Today)) { liste.Rows[i].Cells[14].Style.ForeColor = Ui.Kirmizi; liste.Rows[i].Cells[14].Style.Font = Ui.Kalin; }
                 liste.Rows[i].Cells[12].Style.ForeColor = t.Sonuc == "Kabul" ? Ui.Yesil : t.Sonuc == "Red" ? Ui.Kirmizi : Ui.Soluk;
@@ -76,7 +78,9 @@ namespace EcoBuildss.UI
             int kabul = l.Count(t => t.Sonuc == "Kabul"), red = l.Count(t => t.Sonuc == "Red");
             var tahminli = l.Where(t => t.Sonuc != "Bekliyor" && t.KabulOlasiligi.HasValue).ToList();
             string isabet = tahminli.Count == 0 ? "" : $" · tahmin isabeti %{100.0 * tahminli.Count(t => (t.KabulOlasiligi >= (d.Kabul?.Esik ?? 0.5)) == (t.Sonuc == "Kabul")) / tahminli.Count:0} ({tahminli.Count} teklif)";
-            ozet.Text = $"{l.Count} teklif · {kabul} kabul · {red} red · {l.Count - kabul - red} bekliyor{isabet}";
+            var gz = Gerceklesen.Ozet(l);
+            string soz = gz is { } g ? $" · gerçekleşen tasarruf sözden ortalama {(g.ortFark >= 0 ? "+" : "−")}{Math.Abs(100 * g.ortFark):0} puan ({g.n} iş)" : "";
+            ozet.Text = $"{l.Count} teklif · {kabul} kabul · {red} red · {l.Count - kabul - red} bekliyor{isabet}{soz}";
             var bek = l.Where(t => t.Sonuc == "Bekliyor").ToList(); var son = l.Where(t => t.Tarih >= DateTime.Today.AddDays(-30)).ToList();
             kpi[0].Text = bek.Count.ToString(); int ara = bek.Count(t => TeklifTakibi.TakipGerekli(t, DateTime.Today));
             kpiAlt[0].Text = bek.Count == 0 ? "takip edilecek teklif yok" : $"toplam {Ui.Tl(bek.Sum(t => t.TeklifTL))}" + (ara > 0 ? $" · {ara} aranmalı" : "");
@@ -113,6 +117,37 @@ namespace EcoBuildss.UI
             f.Controls.Add(g);
             d.Db.Gunluk("Satışçı raporu görüntülendi");
             f.ShowDialog(this);
+        }
+
+        /// <summary>Kabul edilen mantolama işinde, önceki ve sonraki yılın doğal gaz tüketimi (m³) ile söz verilen tasarrufun karşılaştırılması.</summary>
+        void GerceklesenGir(KayitliTeklif t)
+        {
+            if (d.Db == null) return;
+            if (t.Sonuc != "Kabul" || t.SozAzalma <= 0) { Ui.Hata(this, "Yalnız kabul edilmiş mantolama işi için girilir."); return; }
+            using var f = new Form { Text = $"{t.TeklifNo} · gerçekleşen", FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false,
+                                     StartPosition = FormStartPosition.CenterParent, ClientSize = new Size(360, 300), BackColor = Color.White, Font = Ui.Yazi };
+            var p = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(30, 16, 20, 10) };
+            NumericUpDown S(double v) => new() { Minimum = 0, Maximum = 1_000_000, DecimalPlaces = 0, Increment = 50, ThousandsSeparator = true, Width = 300, Value = (decimal)v };
+            var once = S(t.GercekOnceM3); var sonra = S(t.GercekSonraM3);
+            var sonuc = new Label { AutoSize = true, MaximumSize = new Size(300, 0), Font = Ui.Kalin, Margin = new Padding(0, 10, 0, 6) };
+            void Goster()
+            {
+                if (once.Value <= 0) { sonuc.Text = $"Söz: −%{100 * t.SozAzalma:0}"; sonuc.ForeColor = Ui.Soluk; return; }
+                double az = Gerceklesen.Azalma((double)once.Value, (double)sonra.Value), fark = az - t.SozAzalma;
+                sonuc.Text = $"Gerçekleşen −%{100 * az:0} · söz −%{100 * t.SozAzalma:0}";
+                sonuc.ForeColor = fark >= -0.05 ? Ui.Yesil : Ui.Kirmizi;
+            }
+            once.ValueChanged += (_, __) => Goster(); sonra.ValueChanged += (_, __) => Goster(); Goster();
+            p.Controls.Add(Ui.Etiket("Önceki yıl doğal gaz (m³)")); p.Controls.Add(once);
+            p.Controls.Add(Ui.Etiket("Sonraki yıl doğal gaz (m³)")); p.Controls.Add(sonra); p.Controls.Add(sonuc);
+            var mesaj = new Label { AutoSize = true, MaximumSize = new Size(300, 0), ForeColor = Ui.Kirmizi };
+            var tamam = Ui.Dugme("Kaydet", (_, __) =>
+            {
+                try { d.Db.GerceklesenKaydet(t.Id, (double)once.Value, (double)sonra.Value); f.DialogResult = DialogResult.OK; }
+                catch (Exception e) when (e is ArgumentException or InvalidOperationException or UnauthorizedAccessException) { mesaj.Text = e.Message; }
+            }, true);
+            p.Controls.Add(tamam); p.Controls.Add(mesaj); f.Controls.Add(p); f.AcceptButton = tamam;
+            if (f.ShowDialog(this) == DialogResult.OK) { Doldur(); d.Bildir($"{t.TeklifNo}: gerçekleşen tüketim kaydedildi."); }
         }
 
         void Sil()
