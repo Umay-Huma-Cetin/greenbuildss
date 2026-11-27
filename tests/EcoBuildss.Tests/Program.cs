@@ -45,6 +45,15 @@ static class Testler
             var uygunsuz = v.Iller.Where(il => KararMotoru.Hesapla(v, new Girdi { Bina = Bina.Dikdortgen(12, 18, 4, 2.9), Il = il, Bolge = il.Ts825Bolge ?? 4, SadeceTs825 = true }).Siralama.Count == 0).Select(il => il.Ad).ToList();
             Dogrula(uygunsuz.Count == 0, "81 ilin hepsinde TS 825'e uyan en az bir paket var", string.Join(", ", uygunsuz));
             {
+                // İndirim: olasılık artar, marj azalır → beklenen kâr içeride en yüksek
+                var egri = EcoBuildss.Core.Uygulamalar.IndirimAnalizi.Egri(i => (1 / (1 + Math.Exp(-(i * 30 - 1.5))), 118_000 * (1 - i)), 100_000);
+                var en = EcoBuildss.Core.Uygulamalar.IndirimAnalizi.EnIyi(egri)!;
+                double kaba = egri.Max(n => n.Kar > 0 ? n.BeklenenKar : double.MinValue);
+                Dogrula(en.Indirim > 0 && en.Indirim < 0.153 && Math.Abs(en.BeklenenKar - kaba) < 0.01 && egri.Last().Kar < 0,
+                        "İndirim analizi: beklenen kârı en yüksek indirim bulunur, zarar eden indirim seçilmez", $"%{en.Indirim * 100:0}");
+                Dogrula(EcoBuildss.Core.Uygulamalar.IndirimAnalizi.EnIyi(EcoBuildss.Core.Uygulamalar.IndirimAnalizi.Egri(i => (0.5, 90_000), 100_000)) == null, "Hiçbir indirimde kâr yoksa öneri yapılmaz");
+            }
+            {
                 var pl = Bina.Plan(80, 300, 5, 3);
                 bool kisa = false; try { Bina.Plan(40, 300, 5, 3); } catch (ArgumentException) { kisa = true; }
                 Dogrula(pl.DisDuvarAlani == 1200 && pl.KullanimAlani == 1500 && pl.Hacim == 4500 && kisa, "Dikdörtgen olmayan plan: çevre ve taban alanından bina; imkânsız çevre reddedilir");
