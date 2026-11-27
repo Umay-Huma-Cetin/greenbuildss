@@ -204,7 +204,7 @@ namespace EcoBuildss.UI
                 YalitimId = s.Yalitim.Id, CamId = s.Cam.Id, DuvarId = s.Duvar.Id, Dograma = SonGirdi.Dograma, Yakit = "DG",
                 En = (double)en.Value, Boy = (double)boy.Value, Cevre = b.En.HasValue ? 0 : (double)cevre.Value, Taban = b.En.HasValue ? 0 : (double)taban.Value, PencereEn = (double)penEn.Value / 100, PencereBoy = (double)penBoy.Value / 100, KatSayisi = b.KatSayisi, KatYuksekligi = (double)katH.Value, CamOrani = SonGirdi.CamOrani,
                 TeklifTL = a.TeklifTL, TeklifTLm2 = a.TeklifTL / SonSonuc.KullanimAlani, GeriOdemeYil = a.GeriOdemeYil, IndirimOrani = (double)indirim.Value / 100,
-                DaireSayisi = a.DaireSayisi, YapimDonemi = (string)yapim.SelectedItem!, DestekDaire = (double)destek.Value,
+                DaireSayisi = a.DaireSayisi, YapimDonemi = (string)yapim.SelectedItem!, DestekDaire = (double)destek.Value, SozAzalma = a.AzalmaOrani,
             };
             if (d.Kabul?.Guvenilir == true)
                 t.KabulOlasiligi = d.Kabul.Olasilik(new Core.Uygulamalar.TeklifOzellik { Il = t.Il, MusteriTipi = t.MusteriTipi, ProjeTuru = t.ProjeTuru, Paket = t.Paket, Oncelik = t.Oncelik,
