@@ -23,10 +23,10 @@ namespace EcoBuildss.UI
         {
             d = durum;
             var ust = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8, 6, 8, 0) };
-            ust.Controls.Add(Ui.Dugme("Kabul edildi", (_, __) => Isaretle("Kabul"), true));
-            ust.Controls.Add(Ui.Dugme("Reddedildi", (_, __) => Isaretle("Red")));
+            ust.Controls.Add(Ui.Dugme("Kabul", (_, __) => Isaretle("Kabul"), true));
+            ust.Controls.Add(Ui.Dugme("Red", (_, __) => Isaretle("Red")));
             ust.Controls.Add(Ui.Dugme("Bekliyor", (_, __) => Isaretle("Bekliyor")));
-            ust.Controls.Add(Ui.Dugme("Teklif ekranında aç", (_, __) => { if (Secili() is KayitliTeklif t) TeklifeYukle?.Invoke(t); }));
+            ust.Controls.Add(Ui.Dugme("Aç", (_, __) => { if (Secili() is KayitliTeklif t) TeklifeYukle?.Invoke(t); }));
             silDugmesi = Ui.Dugme("Sil", (_, __) => Sil());
             ust.Controls.Add(silDugmesi);
             ust.Controls.Add(ozet);
@@ -40,7 +40,7 @@ namespace EcoBuildss.UI
                 p.Controls.Add(kpi[i]); p.Controls.Add(kpiAlt[i]); bant.Controls.Add(p, i, 0);
             }
             var baslik = new Label { Text = "Tekliflerim", Dock = DockStyle.Top, Height = 40, Font = new Font("Segoe UI Semibold", 14f), ForeColor = Ui.Koyu, Padding = new Padding(12, 8, 0, 0) };
-            Controls.Add(Ui.Kart("Teklifler", liste, "Toplantı ya da görüşme sonucunu işaretleyin; kazanma olasılığı tahmini bu sonuçlardan öğrenir"));
+            Controls.Add(Ui.Kart("Teklifler", liste));
             Controls.Add(ust); Controls.Add(bant); Controls.Add(baslik);
             liste.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0 && Secili() is KayitliTeklif t) TeklifeYukle?.Invoke(t); };
             d.TekliflerDegisti += Doldur;
@@ -70,7 +70,7 @@ namespace EcoBuildss.UI
             var bek = l.Where(t => t.Sonuc == "Bekliyor").ToList(); var son = l.Where(t => t.Tarih >= DateTime.Today.AddDays(-30)).ToList();
             kpi[0].Text = bek.Count.ToString(); kpiAlt[0].Text = bek.Count == 0 ? "takip edilecek teklif yok" : $"toplam {Ui.Tl(bek.Sum(t => t.TeklifTL))}";
             kpi[1].Text = kabul + red == 0 ? "—" : Ui.Yuzde((double)kabul / (kabul + red), "0"); kpiAlt[1].Text = $"{kabul} kabul / {red} red";
-            kpi[2].Text = Ui.Tl(l.Where(t => t.Sonuc == "Kabul").Sum(t => t.TeklifTL)); kpiAlt[2].Text = "kabul edilen tekliflerin toplamı";
+            kpi[2].Text = Ui.Tl(l.Where(t => t.Sonuc == "Kabul").Sum(t => t.TeklifTL)); kpiAlt[2].Text = "";
             kpi[3].Text = son.Count.ToString(); kpiAlt[3].Text = $"teklif · {Ui.Tl(son.Sum(t => t.TeklifTL))}";
         }
 
@@ -80,7 +80,7 @@ namespace EcoBuildss.UI
             try { d.Db.SonucIsaretle(t.Id, sonuc); } catch (UnauthorizedAccessException e) { Ui.Hata(this, e.Message); return; }
             Doldur();
             d.ModelleriKur();
-            d.Bildir($"{t.TeklifNo}: {sonuc}. Kabul tahmini modeli güncellendi.");
+            d.Bildir($"{t.TeklifNo}: {sonuc}.");
         }
 
         void Sil()

@@ -6,7 +6,7 @@ using System.Linq;
 using EcoBuildss.Core;
 using EcoBuildss.Core.Depo;
 using EcoBuildss.Core.Ogrenme;
-using EcoBuildss.Core.Sentetik;
+using EcoBuildss.Tests;
 using EcoBuildss.Core.Uygulamalar;
 using EcoBuildss.Core.Veri;
 
@@ -26,8 +26,25 @@ static class Testler
     static int Main(string[] args)
     {
         string kok = Kok();
+        if (args.Contains("--butunluk-yaz")) { ReferansButunluk.Yaz(Path.Combine(kok, "veri", "referans")); Console.WriteLine("BUTUNLUK.sha256 yazıldı."); }
         var v = VeriDeposu.Yukle(Path.Combine(kok, "veri", "referans"));
         var sw = Stopwatch.StartNew();
+
+        Bolum("Referans veri bütünlüğü");
+        {
+            var sorun = ReferansButunluk.Denetle(Path.Combine(kok, "veri", "referans"));
+            Dogrula(sorun.Count == 0, "Referans dosyaları imzalı özetlerle aynı", string.Join("; ", sorun));
+            string gecici = Path.Combine(Path.GetTempPath(), "eb_ref_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(gecici);
+            foreach (var f in Directory.GetFiles(Path.Combine(kok, "veri", "referans"))) File.Copy(f, Path.Combine(gecici, Path.GetFileName(f)));
+            File.AppendAllText(Path.Combine(gecici, "malzemeler.csv"), "\n");
+            File.WriteAllText(Path.Combine(gecici, "iller.csv"), File.ReadAllText(Path.Combine(gecici, "iller.csv")).Replace("\n", "\r\n"));
+            var s2 = ReferansButunluk.Denetle(gecici);
+            Dogrula(s2.Count == 1 && s2[0].StartsWith("malzemeler.csv"), "Değiştirilen dosya yakalanır, satır sonu farkı yanlış alarm vermez", string.Join("; ", s2));
+            Directory.Delete(gecici, true);
+            var uygunsuz = v.Iller.Where(il => KararMotoru.Hesapla(v, new Girdi { Bina = Bina.Dikdortgen(12, 18, 4, 2.9), Il = il, Bolge = il.Ts825Bolge ?? 4, SadeceTs825 = true }).Siralama.Count == 0).Select(il => il.Ad).ToList();
+            Dogrula(uygunsuz.Count == 0, "81 ilin hepsinde TS 825'e uyan en az bir paket var", string.Join(", ", uygunsuz));
+        }
 
         Bolum("Matematik ve metrikler");
         {
@@ -209,6 +226,7 @@ static class Testler
         Bolum("Veritabanı (SQLite)");
         {
             string dosya = Path.Combine(Path.GetTempPath(), $"ecobuildss_test_{Guid.NewGuid():N}.db");
+            string? kurtarma = null;
             using (var db = new Veritabani(dosya))
             {
                 var sema = Semalar.Teklif(v);
@@ -267,9 +285,42 @@ static class Testler
                 db.TeklifKaydet(new KayitliTeklif { TeklifNo = db.YeniTeklifNo(), Il = "Malatya", KullanimAlani = 100, TeklifTL = 1, TeklifTLm2 = 1 });
                 Dogrula(db.Teklifler().Count == 2, "Yedekten sonra yeni teklif");
                 db.GeriYukle(yedek);
-                Dogrula(db.Teklifler().Count == 1 && db.Aktif?.KullaniciAdi == "ayse", "Yedekten geri yükleme");
+                Dogrula(db.Aktif == null, "Geri yüklemeden sonra yeniden oturum açılmalı");
+                db.GirisYap("ayse", "Gizli2026!");
+                Dogrula(db.Teklifler().Count == 1 && db.Teklifler()[0].Musteri == t.Musteri, "Yedekten geri yükleme (şifreli alanlar çözülür)");
                 Dogrula(db.Yedekler().Count >= 2, "Geri yüklemeden önce mevcut durum yedeklenir");
                 Dogrula(db.OtomatikYedek() != null && db.OtomatikYedek() == null, "Otomatik yedek günde bir kez alınır");
+
+                // ---- Şifreleme ----
+                Bolum("Şifreleme");
+                var k64 = Sifreleme.YeniAnahtar();
+                string c = Sifreleme.Sifrele(k64, "Gül Apartmanı 1.073.387 TL");
+                Dogrula(Sifreleme.Coz(k64, c) == "Gül Apartmanı 1.073.387 TL" && c != Sifreleme.Sifrele(k64, "Gül Apartmanı 1.073.387 TL"), "AES-256 + HMAC: çözülür, her şifrelemede farklı çıktı");
+                var bozuk = Convert.FromBase64String(c.Substring(3)); bozuk[20] ^= 1;
+                bool yakalandi = false; try { Sifreleme.Coz(k64, "e1:" + Convert.ToBase64String(bozuk)); } catch (System.Security.Cryptography.CryptographicException) { yakalandi = true; }
+                Dogrula(yakalandi, "Şifreli değerde tek bit değişikliği yakalanır");
+                yakalandi = false; try { Sifreleme.Coz(Sifreleme.YeniAnahtar(), c); } catch (System.Security.Cryptography.CryptographicException) { yakalandi = true; }
+                Dogrula(yakalandi, "Yanlış anahtarla çözülemez");
+                kurtarma = db.YeniKurtarmaAnahtari;
+            }
+            // Diskteki dosyada müşteri adı, tutar ve içe aktarılan veri düz metin olarak bulunmamalı
+            using (var ham = new SqliteBaglanti(dosya))
+            {
+                var tek1 = ham.Sorgu("SELECT musteri, teklif_tl, gizli FROM teklifler")[0];
+                Dogrula((string)tek1["musteri"]! == "" && Convert.ToDouble(tek1["teklif_tl"]) == 0 && ((string)tek1["gizli"]!).StartsWith("e1:"), "Teklifte müşteri ve tutar diskte şifreli");
+                Dogrula(ham.Sorgu("SELECT satir FROM veri_kayitlari").All(r => ((string)r["satir"]!).StartsWith("e1:")), "İçe aktarılan veri diskte şifreli");
+                Dogrula(!ham.Sorgu("SELECT ayrinti FROM islem_gunlugu WHERE islem = 'Teklif kaydedildi'").Any(r => ((string)r["ayrinti"]!).Contains("Malatya")), "Günlük ayrıntısı diskte şifreli");
+                Dogrula(ham.Sorgu("SELECT sarili FROM anahtarlar").Count >= 3, "Veri anahtarı her kullanıcı ve kurtarma için ayrı sarılı");
+            }
+            using (var db = new Veritabani(dosya))
+            {
+                bool hata = false; try { db.KurtarmaIleSifirla("ayse", "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE", "Yeni2026xx"); } catch (ArgumentException) { hata = true; }
+                Dogrula(hata, "Yanlış kurtarma anahtarı reddedilir");
+                Dogrula(kurtarma != null && kurtarma.Length == 29, "İlk kurulumda kurtarma anahtarı üretilir");
+                db.KurtarmaIleSifirla("ayse", kurtarma!.ToLowerInvariant().Replace("-", " "), "Yeni2026xx");
+                Dogrula(db.GirisYap("ayse", "Yeni2026xx") == GirisSonucu.Basarili && db.Teklifler()[0].TeklifTL == 500000, "Kurtarma anahtarıyla parola yenilenir, veri okunur");
+                db.OturumKapat();
+                Dogrula(db.GirisYap("ayse", "Gizli2026!") == GirisSonucu.HataliBilgi, "Eski parola artık geçmez");
             }
             // Günlük sonradan değiştirilirse zincir bozulur
             using (var ham = new SqliteBaglanti(dosya)) ham.Yaz("UPDATE islem_gunlugu SET ayrinti = 'değiştirildi' WHERE id = 3");

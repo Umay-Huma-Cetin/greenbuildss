@@ -72,11 +72,11 @@ CREATE TABLE IF NOT EXISTS ayarlar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NUL
                 foreach (var k in kayitlar)
                 {
                     b.Yaz("INSERT OR REPLACE INTO veri_kayitlari (veri_seti, anahtar, kaynak, satir, eklenme) VALUES (@s, @a, @k, @r, @e)", new Dictionary<string, object?>
-                    { ["s"] = sema.DosyaAdi, ["a"] = k.Metin(sema.AnahtarAlan!), ["k"] = kaynak, ["r"] = Satir(sema, k), ["e"] = DateTime.Now });
+                    { ["s"] = sema.DosyaAdi, ["a"] = k.Metin(sema.AnahtarAlan!), ["k"] = kaynak, ["r"] = Sifrele(Satir(sema, k)), ["e"] = DateTime.Now });
                     n++;
                 }
             });
-            Gunluk("Veri içe aktarıldı", $"{sema.Ad}: {n} kayıt ({kaynak})");
+            Gunluk("Veri içe aktarıldı", $"{sema.Ad}: {n} kayıt");
             return n;
         }
 
@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS ayarlar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NUL
         {
             var rows = b.Sorgu("SELECT satir, kaynak FROM veri_kayitlari WHERE veri_seti = @s ORDER BY anahtar", new Dictionary<string, object?> { ["s"] = sema.DosyaAdi });
             var sb = new StringBuilder(string.Join(",", sema.Alanlar.Select(a => a.Ad)) + "\n");
-            foreach (var r in rows) sb.AppendLine((string)r["satir"]!);
+            foreach (var r in rows) sb.AppendLine(Coz((string)r["satir"]!));
             string kaynak = rows.Count == 0 ? "" : (string)rows[0]["kaynak"]!;
             return (IceAktarici.Metinden(sb.ToString(), sema), kaynak);
         }
@@ -104,15 +104,16 @@ CREATE TABLE IF NOT EXISTS ayarlar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NUL
             t.Hazirlayan = Aktif!.KullaniciAdi;
             var p = new Dictionary<string, object?>
             {
-                ["no"] = t.TeklifNo, ["tarih"] = t.Tarih.ToString("yyyy-MM-dd"), ["musteri"] = t.Musteri, ["mt"] = t.MusteriTipi, ["il"] = t.Il, ["pt"] = t.ProjeTuru,
+                ["no"] = t.TeklifNo, ["tarih"] = t.Tarih.ToString("yyyy-MM-dd"), ["musteri"] = "", ["mt"] = t.MusteriTipi, ["il"] = t.Il, ["pt"] = t.ProjeTuru,
                 ["alan"] = t.KullanimAlani, ["paket"] = t.Paket, ["onc"] = t.Oncelik, ["y"] = t.YalitimId, ["c"] = t.CamId, ["d"] = t.DuvarId, ["dog"] = t.Dograma,
                 ["yak"] = t.Yakit, ["en"] = t.En, ["boy"] = t.Boy, ["kat"] = t.KatSayisi, ["kh"] = t.KatYuksekligi, ["co"] = t.CamOrani, ["sog"] = t.Sogutma,
-                ["tl"] = t.TeklifTL, ["tlm2"] = t.TeklifTLm2, ["go"] = t.GeriOdemeYil, ["ind"] = t.IndirimOrani, ["yan"] = t.YanitSuresiGun, ["rak"] = t.RakipTeklif,
-                ["ko"] = t.KabulOlasiligi, ["son"] = t.Sonuc, ["ds"] = t.DaireSayisi, ["haz"] = t.Hazirlayan,
+                ["tl"] = 0.0, ["tlm2"] = 0.0, ["go"] = t.GeriOdemeYil, ["ind"] = 0.0, ["yan"] = t.YanitSuresiGun, ["rak"] = t.RakipTeklif,
+                ["ko"] = null, ["son"] = t.Sonuc, ["ds"] = t.DaireSayisi, ["haz"] = t.Hazirlayan,
+                ["gizli"] = Sifrele(GizliBirlestir(t.Musteri, t.TeklifTL, t.TeklifTLm2, t.IndirimOrani, t.KabulOlasiligi)),
             };
             t.Id = b.Yaz(@"INSERT INTO teklifler (teklif_no, tarih, musteri, musteri_tipi, il, proje_turu, kullanim_alani, paket, oncelik, yalitim_id, cam_id, duvar_id, dograma, yakit,
-                en, boy, kat_sayisi, kat_yuksekligi, cam_orani, sogutma, teklif_tl, teklif_tl_m2, geri_odeme_yil, indirim_orani, yanit_suresi_gun, rakip_teklif, kabul_olasiligi, sonuc, daire_sayisi, hazirlayan)
-                VALUES (@no, @tarih, @musteri, @mt, @il, @pt, @alan, @paket, @onc, @y, @c, @d, @dog, @yak, @en, @boy, @kat, @kh, @co, @sog, @tl, @tlm2, @go, @ind, @yan, @rak, @ko, @son, @ds, @haz)", p);
+                en, boy, kat_sayisi, kat_yuksekligi, cam_orani, sogutma, teklif_tl, teklif_tl_m2, geri_odeme_yil, indirim_orani, yanit_suresi_gun, rakip_teklif, kabul_olasiligi, sonuc, daire_sayisi, hazirlayan, gizli)
+                VALUES (@no, @tarih, @musteri, @mt, @il, @pt, @alan, @paket, @onc, @y, @c, @d, @dog, @yak, @en, @boy, @kat, @kh, @co, @sog, @tl, @tlm2, @go, @ind, @yan, @rak, @ko, @son, @ds, @haz, @gizli)", p);
             Gunluk("Teklif kaydedildi", $"{t.TeklifNo} · {t.Il} · {t.Paket} · {t.TeklifTL:N0} TL");
             return t.Id;
         }
@@ -136,7 +137,7 @@ CREATE TABLE IF NOT EXISTS ayarlar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NUL
 
         string TeklifNo(long id) => b.Sorgu("SELECT teklif_no FROM teklifler WHERE id = @id", new Dictionary<string, object?> { ["id"] = id }).Select(r => S(r["teklif_no"])).FirstOrDefault() ?? $"#{id}";
 
-        public List<KayitliTeklif> Teklifler() => b.Sorgu("SELECT * FROM teklifler ORDER BY tarih DESC, id DESC").Select(r => new KayitliTeklif
+        public List<KayitliTeklif> Teklifler() => b.Sorgu("SELECT * FROM teklifler ORDER BY tarih DESC, id DESC").Select(r => GizliAc(S(r["gizli"]), new KayitliTeklif
         {
             Id = (long)r["id"]!, TeklifNo = S(r["teklif_no"]), Tarih = DateTime.ParseExact(S(r["tarih"]), "yyyy-MM-dd", CultureInfo.InvariantCulture), Musteri = S(r["musteri"]),
             MusteriTipi = S(r["musteri_tipi"]), Il = S(r["il"]), ProjeTuru = S(r["proje_turu"]), KullanimAlani = D(r["kullanim_alani"]), Paket = S(r["paket"]), Oncelik = S(r["oncelik"]),
@@ -145,7 +146,19 @@ CREATE TABLE IF NOT EXISTS ayarlar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NUL
             TeklifTL = D(r["teklif_tl"]), TeklifTLm2 = D(r["teklif_tl_m2"]), GeriOdemeYil = r["geri_odeme_yil"] == null ? null : D(r["geri_odeme_yil"]),
             IndirimOrani = D(r["indirim_orani"]), YanitSuresiGun = D(r["yanit_suresi_gun"]), RakipTeklif = (r["rakip_teklif"] as long?) == 1,
             KabulOlasiligi = r["kabul_olasiligi"] == null ? null : D(r["kabul_olasiligi"]), Sonuc = S(r["sonuc"]), DaireSayisi = (int)(r["daire_sayisi"] as long? ?? 0), Hazirlayan = S(r["hazirlayan"]),
-        }).ToList();
+        })).ToList();
+
+        /// <summary>Şifreli alanlar (müşteri, tutarlar, indirim, kabul olasılığı) çözülür.</summary>
+        KayitliTeklif GizliAc(string gizli, KayitliTeklif t)
+        {
+            if (gizli.Length == 0) return t;
+            string duz = Coz(gizli);
+            var p = duz.Split('\u001f');
+            if (p.Length != 5) { t.Musteri = duz; return t; }   // "(şifreli)" ya da bozuk
+            double Sayi(string x) => double.Parse(x, CultureInfo.InvariantCulture);
+            t.Musteri = p[0]; t.TeklifTL = Sayi(p[1]); t.TeklifTLm2 = Sayi(p[2]); t.IndirimOrani = Sayi(p[3]); t.KabulOlasiligi = p[4].Length == 0 ? null : Sayi(p[4]);
+            return t;
+        }
 
         /// <summary>Sonucu belli olan (kabul/red) kayıtlı teklifler, teklif geçmişi şemasında satır olarak — modeli firmanın kendi sonuçlarıyla besler.</summary>
         public string SonuclananTekliflerCsv(Sema teklifSemasi)

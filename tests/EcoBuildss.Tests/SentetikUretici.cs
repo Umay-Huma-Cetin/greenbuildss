@@ -3,14 +3,15 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using EcoBuildss.Core;
 using EcoBuildss.Core.Ogrenme;
 using EcoBuildss.Core.Uygulamalar;
 using EcoBuildss.Core.Veri;
 
-namespace EcoBuildss.Core.Sentetik
+namespace EcoBuildss.Tests
 {
     /// <summary>
-    /// ÖRNEK (SENTETİK) VERİ ÜRETECİ — gerçek veri yerine geçmez.
+    /// TEST VERİSİ ÜRETECİ (yalnız testlerde) — gerçek veri yerine geçmez, uygulamada kullanılmaz.
     /// Firmanın kendi faturası ve teklif kaydı henüz yokken uygulamanın bütün adımlarını denemek için, gerçek veriyle
     /// aynı şemada dosya üretir. Binalar gerçek il iklimi ve gerçek malzeme/fiyat verisiyle hesaplanır; davranış kısmı
     /// (kullanıcı alışkanlığı, müşteri kararı) aşağıda açıkça yazılı varsayımlarla ve gürültüyle üretilir.

@@ -37,8 +37,7 @@ namespace EcoBuildss.UI
             sekme.TabPages.Add(Sayfa("Sınıflandırma · teklif kabul tahmini", SiniflandirmaSayfasi()));
             sekme.TabPages.Add(Sayfa("Kümeleme · bölge ve müşteri segmentleri", KumelemeSayfasi()));
             var ust = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 40, Padding = new Padding(6, 2, 0, 0) };
-            ust.Controls.Add(Ui.Dugme("Modelleri kayıtlı veriyle yeniden kur", (_, __) => { Cursor = Cursors.WaitCursor; try { d.ModelleriKur(); } finally { Cursor = Cursors.Default; } }, true));
-            ust.Controls.Add(Ui.Aciklama("Modeller her veri yüklemesinde ve uygulama açılışında kendiliğinden yeniden kurulur. Sonuçlar veritabanına (model_calismalari) yazılır.", 700));
+            ust.Controls.Add(Ui.Dugme("Yenile", (_, __) => { Cursor = Cursors.WaitCursor; try { d.ModelleriKur(); } finally { Cursor = Cursors.Default; } }, true));
             Controls.Add(sekme); Controls.Add(ust);
             try { harita.Iller.AddRange(HaritaPanel.Oku(Path.Combine(d.Referans, "il_sinirlari.csv"))); } catch { }
             d.ModellerDegisti += Goster;
@@ -53,10 +52,10 @@ namespace EcoBuildss.UI
             var sol = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2 };
             sol.RowStyles.Add(new RowStyle(SizeType.Percent, 45)); sol.RowStyles.Add(new RowStyle(SizeType.Percent, 55));
             var p1 = new Panel(); p1.Controls.Add(kalKatsayi); p1.Controls.Add(kalMetin); kalMetin.Dock = DockStyle.Top; p1.Controls.Add(kalRozet);
-            sol.Controls.Add(Ui.Kart("Katsayılar", p1, "gerçek yakıt = β₀ + β₁ · model ısıtma yakıtı + β₂ · alan × sıcak su"), 0, 0);
-            sol.Controls.Add(Ui.Kart("Doğrulama ölçüleri", kalOlcu, "5 katlı çapraz doğrulama: her kayıt, kendisinin olmadığı veriyle kurulan modelle tahmin edildi"), 0, 1);
+            sol.Controls.Add(Ui.Kart("Katsayılar", p1), 0, 0);
+            sol.Controls.Add(Ui.Kart("Doğrulama ölçüleri", kalOlcu), 0, 1);
             iz.Controls.Add(sol, 0, 0);
-            iz.Controls.Add(Ui.Kart("Gerçek – tahmin", kalGrafik, "Köşegene yakın noktalar iyi tahmin; Cook uzaklığı 4/n'yi aşan kayıtlar işaretli"), 1, 0);
+            iz.Controls.Add(Ui.Kart("Gerçek – tahmin", kalGrafik), 1, 0);
             return iz;
         }
 
@@ -67,7 +66,7 @@ namespace EcoBuildss.UI
             iz.RowCount = 2; iz.RowStyles.Add(new RowStyle(SizeType.Percent, 50)); iz.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
             var p1 = new Panel(); p1.Controls.Add(sinAday); p1.Controls.Add(sinMetin); sinMetin.Dock = DockStyle.Top; p1.Controls.Add(sinRozet);
             iz.Controls.Add(Ui.Kart("Aday modeller (eğitim kümesinde 5 katlı tabakalı çapraz doğrulama)", p1), 0, 0);
-            iz.Controls.Add(Ui.Kart("Test kümesi (seçimde hiç kullanılmadı)", sinTest, "Kalite kapısı: test F1 ≥ 0,87 ve AUC ≥ 0,80 ve \"hep kabul\" tahmininden belirgin iyi"), 1, 0);
+            iz.Controls.Add(Ui.Kart("Test kümesi (seçimde hiç kullanılmadı)", sinTest), 1, 0);
             iz.Controls.Add(Ui.Kart("Değişken önemleri", sinOnem), 0, 1);
             iz.Controls.Add(Ui.Kart("Satış ekibi için kurallar (derinliği 3 karar ağacı)", sinKural), 1, 1);
             return iz;
@@ -83,7 +82,7 @@ namespace EcoBuildss.UI
             var iz = Ui.Izgara2(2, 42, 58);
             var sol = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2 };
             sol.RowStyles.Add(new RowStyle(SizeType.Percent, 42)); sol.RowStyles.Add(new RowStyle(SizeType.Percent, 58));
-            sol.Controls.Add(Ui.Kart("k seçimi", kumeTablo, "Davies–Bouldin düşük = iyi · siluet yüksek = iyi"), 0, 0);
+            sol.Controls.Add(Ui.Kart("k seçimi", kumeTablo), 0, 0);
             sol.Controls.Add(Ui.Kart("Kümeler", kumeSeg), 0, 1);
             iz.Controls.Add(sol, 0, 0);
             var sag = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2 };
@@ -183,7 +182,7 @@ namespace EcoBuildss.UI
                 else
                 {
                     var (t, _) = d.Teklifler();
-                    if (t.Count < 10) { kumeMetin.Text = "Müşteri segmentleri için Veri sekmesinden teklif geçmişi yükleyin."; kumeGrafik.Invalidate(); harita.Invalidate(); return; }
+                    if (t.Count < 10) { kumeMetin.Text = "Teklif geçmişi yok."; kumeGrafik.Invalidate(); harita.Invalidate(); return; }
                     s = Segmentasyon.Musteriler(t, k is int x && x > 6 ? 6 : k);
                 }
             }

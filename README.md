@@ -33,6 +33,15 @@ Geliştiren: **Umay Hüma Çetin**
 - Yetki yalnız arayüzde değil, veritabanı katmanında da denetlenir. Yetkisiz istek reddedilir ve günlüğe yazılır.
 - Sistemde en az bir etkin yönetici kalması zorunludur.
 
+**Şifreleme**
+- Müşteri adı, teklif tutarı, indirim, kabul olasılığı, içe aktarılan veri satırları ve günlük ayrıntıları veritabanında şifreli tutulur: AES-256-CBC + HMAC-SHA256 (önce şifrele, sonra doğrula), her değer için rastgele IV.
+- Veri anahtarı rastgele üretilir ve hiçbir zaman düz saklanmaz. Her kullanıcının parolasından PBKDF2 ile türetilen anahtarla ayrı ayrı sarılır. Veritabanı dosyası kopyalansa bile parola olmadan bu alanlar okunamaz.
+- İlk kurulumda 25 karakterlik bir **kurtarma anahtarı** bir kez gösterilir. Yönetici parolasını unutursa giriş ekranındaki **Parolamı unuttum** ile bu anahtarla yeni parola belirler. Anahtar kaybolursa ve hiçbir yönetici parolasını hatırlamıyorsa şifreli veri açılamaz.
+- Oturum kapanınca anahtar bellekten silinir.
+
+**Referans veri bütünlüğü**
+- `veri/referans` dosyalarının SHA-256 özetleri `BUTUNLUK.sha256` dosyasındadır. Program her açılışta denetler; değiştirilmiş dosya varsa uyarır ve günlüğe Güvenlik kaydı düşer.
+
 **Parolalar ve oturum**
 - Parolalar PBKDF2-HMAC-SHA256 ile saklanır: 600.000 tekrar, kullanıcıya özel tuz. Parolanın kendisi hiçbir yerde tutulmaz.
 - Parola kuralı: en az 8 karakter, harf ve rakam içermeli, kullanıcı adını içermemeli.
@@ -49,17 +58,21 @@ Geliştiren: **Umay Hüma Çetin**
   - ayar, kullanıcı ve parola değişiklikleri
   - yedek alma ve geri yükleme
   - hatalar
-- Her kayıt bir öncekinin SHA-256 özetini içerir. Kayıtlar böylece zincirlenir: biri sonradan değiştirilir ya da silinirse **Güvenlik ve yedek** sekmesindeki denetim bunu bulur.
+- Her kayıt bir öncekinin SHA-256 özetini içerir. Kayıtlar böylece zincirlenir: biri sonradan değiştirilir ya da silinirse denetim bunu bulur.
+- Günlük **Veri ve modeller → Günlük** sekmesinden okunur: seviyeye göre süzülür, metinle aranır, **Denetle** zinciri baştan doğrular.
 - Veritabanına yazılamayan hatalar ayrıca `%AppData%\EcoBuildss\hata.log` dosyasına yazılır.
 
 **Yedek**
 - Program her gün ilk açılışta otomatik yedek alır ve son 14 günün yedeğini saklar.
-- Yönetici istediği an yedek alabilir ve yedekten geri yükleyebilir. Geri yüklemeden önce mevcut durum ayrıca yedeklenir.
+- Yönetici **Yedek** sekmesinden istediği an yedek alabilir ve yedekten geri yükleyebilir. Geri yüklemeden önce mevcut durum ayrıca yedeklenir; geri yüklemeden sonra yeniden giriş istenir.
 - Yedekler SQLite'ın çevrimiçi yedekleme arayüzüyle alınır, yani tutarlıdır.
 
-**Sınır:** Veritabanı dosyası şifreli değildir; Windows'un kendi SQLite'ı şifrelemeyi desteklemez. Dosya, kullanıcının kendi `%AppData%` klasöründe Windows dosya izinleriyle korunur. Günlükteki değişiklikler zincir sayesinde fark edilir.
+**Sınır:** Tablo ve sütun adları, tarih, il ve alan gibi hesap için gereken alanlar düz tutulur; kişisel ve ticari bilgi şifrelidir. Yedekler de aynı şekilde şifreli alanlarla alınır.
 
-![Güvenlik ve yedek](docs/ekran/08_guvenlik_ve_yedek.png)
+| | |
+|---|---|
+| ![Günlük](docs/ekran/08_gunluk.png) | ![Yedek](docs/ekran/09_yedek.png) |
+| ![Kullanıcılar](docs/ekran/07_kullanicilar.png) | |
 
 ## Kurulum
 
@@ -75,10 +88,10 @@ Hiçbir NuGet paketi gerekmez. SQLite'a Windows'un kendi `winsqlite3.dll` dosyas
 
 İlk açılışta veri yoktur. Teklif ekranı yine çalışır; enerji TS 825 modeliyle hesaplanır, kabul tahmini kapalıdır.
 
-1. **Veri ve modeller → Veri yükleme → Boş şablon kaydet.** Tüketim kayıtları (faturalar) ve teklif geçmişi (CRM) için şablonu alın. Sütunlar [docs/VERI_SOZLUGU.md](docs/VERI_SOZLUGU.md) dosyasında açıklanmıştır.
+1. **Veri ve modeller → Veri → Şablon.** Tüketim kayıtları (faturalar) ve teklif geçmişi (CRM) için şablonu alın. Sütunlar [docs/VERI_SOZLUGU.md](docs/VERI_SOZLUGU.md) dosyasında açıklanmıştır.
 2. Şablonu Excel'de doldurup CSV olarak kaydedin. Türkçe Excel'in `;` ayırıcısı ve `1.234,5` sayı biçimi de okunur.
-3. **Kendi dosyamı içe aktar.** Denetim raporu her hatalı satırın satır numarasını, sütununu ve nedenini gösterir. Gerçek veri yüklenince örnek veri silinir, ikisi karışmaz.
-4. **Modeller ve doğrulama** sekmesinde sonuçlara bakın. Bir model ancak kalite eşiğini geçerse teklif ekranında kullanılır:
+3. **İçe aktar.** Denetim raporu her hatalı satırın satır numarasını, sütununu ve nedenini gösterir; hatalı satır alınmaz.
+4. **Modeller** sekmesinde sonuçlara bakın. Bir model ancak kalite eşiğini geçerse teklif ekranında kullanılır:
    - **Kalibrasyon:** en az 20 kayıt gerekir. Görülmemiş kayıtlarda (5 katlı çapraz doğrulama) hatayı düşürmüyorsa uygulanmaz.
    - **Kabul tahmini:** en az 100 teklif ve her sonuçtan en az 20 kayıt gerekir. Modelin seçimde hiç kullanılmamış %25'lik test kümesinde şu üç koşulu sağlaması gerekir:
      - F1 ≥ 0,87
@@ -88,43 +101,41 @@ Hiçbir NuGet paketi gerekmez. SQLite'a Windows'un kendi `winsqlite3.dll` dosyas
      Sağlamazsa teklif ekranında **gösterilmez**.
 5. Uygulamada verilen her teklifi kaydedin, sonucu belli olunca **Tekliflerim** ekranında Kabul/Red işaretleyin. Model bu kayıtlarla kendini yeniden kurar.
 
-Gerçek veri yokken denemek için **Veri yükleme → Örnek (sentetik) veriyi yükle** düğmesi vardır. Örnek veri kullanıldığı sürece sol altta uyarı görünür.
-
 ## Modeller ve doğrulama
 
-Aşağıdaki sonuçlar `veri/ornek` klasöründeki **sentetik** veriyle alınmıştır. Bu verideki binalar gerçek il iklimi ve gerçek malzeme fiyatlarıyla hesaplanmıştır. Kullanıcı ve müşteri davranışı ise `SentetikUretici.cs` içinde açıkça yazılı varsayımlarla üretilmiştir: kullanıcılar modelin %85'i kadar ısıtır, binadan binaya %18 sapma vardır, müşteri kararına gürültü eklenmiştir.
+Programda örnek ya da sentetik veri yoktur; modeller yalnız firmanın kendi verisiyle kurulur. Modellerin kendisini sınamak için testler `tests/EcoBuildss.Tests/SentetikUretici.cs` ile **sentetik** veri üretir; aşağıdaki sonuçlar bu veriyle alınmıştır. Bu verideki binalar gerçek il iklimi ve gerçek malzeme fiyatlarıyla hesaplanmıştır. Kullanıcı ve müşteri davranışı ise `SentetikUretici.cs` içinde açıkça yazılı varsayımlarla üretilmiştir: kullanıcılar modelin %85'i kadar ısıtır, binadan binaya %18 sapma vardır, müşteri kararına gürültü eklenmiştir.
 
 Sentetik veride F1 bu varsayımlara bağlıdır. Gerçek veride başarı, verinin kendisine bağlıdır ve önceden bilinemez. Bu yüzden kalite eşiği uygulamanın içindedir.
 
-| Model | Ne çözer | Doğrulama | Sonuç (örnek veri) |
+| Model | Ne çözer | Doğrulama | Sonuç (test verisi) |
 |---|---|---|---|
 | Kalibrasyon regresyonu | TS 825 modeli gerçek faturadan ne kadar sapıyor? Sıcak su baz yükü ne kadar? | 5 katlı çapraz doğrulama, ASHRAE Guideline 14 | β₁ = 0,814 (%95 GA 0,783–0,844); CV(RMSE) %23,6 → %18,8; NMBE %0,08 |
-| Teklif kabul tahmini | Bu teklif kabul edilir mi? Hangi koşul kabulü artırır? | Tabakalı 5 katlı çapraz doğrulama + ayrı test kümesi | Lojistik regresyon. Çapraz doğrulama F1 0,896 ± 0,014. Test: F1 0,915, AUC 0,964 ("hep kabul" tahmininin F1'i 0,718) |
+| Teklif kabul tahmini | Bu teklif kabul edilir mi? Hangi koşul kabulü artırır? | Tabakalı 5 katlı çapraz doğrulama + ayrı test kümesi | Lojistik regresyon. Çapraz doğrulama F1 0,905 ± 0,026. Test: F1 0,913, AUC 0,954 ("hep kabul" tahmininin F1'i 0,750) |
 | İl kümeleme | Pazar hangi iklim bölgelerine ayrılıyor? Bölgeye standart paket ne olmalı? | Davies–Bouldin, siluet | k = 2 (DB 0,594, siluet 0,570). Gerçek MGM verisi |
-| Müşteri segmentleri | Hangi müşteri grubu hangi koşulda kabul ediyor? | Davies–Bouldin, siluet | k = 4 (siluet 0,32) |
+| Müşteri segmentleri | Hangi müşteri grubu hangi koşulda kabul ediyor? | Davies–Bouldin, siluet | k = 6 (siluet 0,30) |
 
 Modellerin doğru çalıştığı da ayrıca sınanmıştır:
 - **Etiketler rastgele karıştırıldığında** (veride sinyal yokken) kabul modeli kalite eşiğinden **geçemez** (AUC ≈ 0,5). Eşiğin sahte başarıyı yakaladığını gösterir.
-- **Python ile bağımsız tekrar:** `araclar/dogrulama/bagimsiz_dogrulama.py` aynı dosyalardan scikit-learn ile yeniden hesaplar. Regresyon katsayıları ve il kümeleri birebir aynı çıkar. Kabul modeli farklı bir rastgele bölmede aynı düzeyde kalır (lojistik regresyon test F1 0,906).
+- **Python ile bağımsız tekrar:** testlerin ürettiği dosyalar `dotnet run --project tests/EcoBuildss.Tests -- --ornek-yaz <klasör>` ile yazılır; `araclar/dogrulama/bagimsiz_dogrulama.py <klasör>` aynı dosyalardan scikit-learn ile yeniden hesaplar. Regresyon katsayıları ve il kümeleri birebir aynı çıkar. Kabul modeli farklı bir rastgele bölmede aynı düzeyde kalır (lojistik regresyon test F1 0,922).
 
 ## Testler
 
 ```
 dotnet run --project tests/EcoBuildss.Tests
-python araclar/dogrulama/bagimsiz_dogrulama.py          # isteğe bağlı: pandas, scikit-learn
-python araclar/dogrulama/bagimsiz_dogrulama.py <klasör> # kendi gerçek veriniz için
+python araclar/dogrulama/bagimsiz_dogrulama.py <klasör>   # isteğe bağlı: pandas, scikit-learn
 ```
 
-81 test vardır ve şunları kapsar:
+96 test vardır ve şunları kapsar:
 - metrikler (F1, AUC, CV(RMSE))
 - regresyon ve gerçek levha fiyatları
 - enerji motoru ve yangın yönetmeliği kuralı
 - hatalı CSV satırlarının reddi
-- uçtan uca örnek veri akışı
+- uçtan uca veri akışı (test içinde üretilen sentetik veriyle)
+- referans veri bütünlüğü; 81 ilin hepsinde TS 825'e uyan paket bulunması
 - az veride ve sinyalsiz veride kalite eşiğinin modeli reddetmesi
 - apartman hesabı (kapsam, faturadan tasarruf, taksit)
 - SQLite kaydı (parametreli sorgu)
-- güvenlik: parola özeti, kilitleme, roller, geçici parola, günlük zinciri ve değişiklik tespiti, yedek ve geri yükleme
+- güvenlik: parola özeti, kilitleme, roller, geçici parola, alan şifreleme ve değiştirilmiş şifreli değerin yakalanması, kurtarma anahtarı, günlük zinciri ve değişiklik tespiti, yedek ve geri yükleme
 
 ## Klasörler
 
@@ -136,12 +147,10 @@ src/EcoBuildss.Core     Hesap çekirdeği (arayüzden bağımsız, test edilebil
   Ogrenme/              Regresyon, lojistik regresyon, karar ağacı, rastgele orman, k-ortalamalar, metrikler (dış kütüphane yok)
   Veri/                 CSV şemaları ve içe aktarma denetimi
   Uygulamalar/          Kalibrasyon, kabul tahmini, segmentasyon
-  Sentetik/             Örnek veri üreteci (yalnız deneme için)
   Depo/                 SQLite (winsqlite3) ve veritabanı
 src/EcoBuildss.App      Windows Forms arayüzü
 tests/EcoBuildss.Tests  Birim ve bütünleşik testler
 veri/referans           İklim (MGM), TS 825:2024, yangın yönetmeliği, malzeme fiyatları, tarifeler; her satırda kaynak
-veri/ornek              Sentetik örnek veri (gerçek değildir)
 araclar/dogrulama       Python ile bağımsız doğrulama
 docs/                   Veri sözlüğü, ekran görüntüleri
 ```

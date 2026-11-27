@@ -2,7 +2,7 @@ using EcoBuildss.Core.Depo;
 
 namespace EcoBuildss.UI
 {
-    /// <summary>Yönetici ekranı: firma bilgileri, kullanıcılar ve roller, güvenlik (yedek, günlük bütünlüğü), veri yükleme, modeller.</summary>
+    /// <summary>Yönetici ekranı: firma, kullanıcılar, işlem günlüğü, yedek, veri, modeller.</summary>
     public sealed class YoneticiSekmesi : UserControl
     {
         readonly Durum d;
@@ -12,13 +12,14 @@ namespace EcoBuildss.UI
             d = durum;
             var sekme = new TabControl { Dock = DockStyle.Fill, Font = Ui.Yazi };
             void Ekle(string ad, Control c) { var t = new TabPage(ad) { BackColor = Ui.Zemin }; c.Dock = DockStyle.Fill; t.Controls.Add(c); sekme.TabPages.Add(t); }
-            Ekle("Firma bilgileri", Firma());
+            Ekle("Firma", Firma());
             Ekle("Kullanıcılar", Kullanicilar());
-            Ekle("Güvenlik ve yedek", Guvenlik());
-            Ekle("Veri yükleme", new VeriSekmesi(d));
-            Ekle("Modeller ve doğrulama", new ModellerSekmesi(d));
+            Ekle("Günlük", Gunluk());
+            Ekle("Yedek", Yedek());
+            Ekle("Veri", new VeriSekmesi(d));
+            Ekle("Modeller", new ModellerSekmesi(d));
             Controls.Add(sekme);
-            Controls.Add(new Label { Text = "Veri ve modeller", Dock = DockStyle.Top, Height = 40, Font = new Font("Segoe UI Semibold", 14f), ForeColor = Ui.Koyu, Padding = new Padding(12, 8, 0, 0) });
+            Controls.Add(new Label { Text = "Yönetim", Dock = DockStyle.Top, Height = 40, Font = new Font("Segoe UI Semibold", 14f), ForeColor = Ui.Koyu, Padding = new Padding(12, 8, 0, 0) });
         }
 
         Control Firma()
@@ -28,17 +29,11 @@ namespace EcoBuildss.UI
             var tel = new TextBox { Width = 360, Text = d.Db?.Ayar("firma_telefon") ?? "" };
             p.Controls.Add(Ui.Etiket("Firma adı")); p.Controls.Add(ad);
             p.Controls.Add(Ui.Etiket("Telefon / e-posta")); p.Controls.Add(tel);
-            p.Controls.Add(Ui.Aciklama("Toplantı sayfasının ve tekliflerin başında görünür.", 360));
             p.Controls.Add(Ui.Dugme("Kaydet", (_, __) =>
             {
-                try { d.Db!.AyarYaz("firma_adi", ad.Text.Trim()); d.Db.AyarYaz("firma_telefon", tel.Text.Trim()); d.Bildir("Firma bilgileri kaydedildi."); }
+                try { d.Db!.AyarYaz("firma_adi", ad.Text.Trim()); d.Db.AyarYaz("firma_telefon", tel.Text.Trim()); d.Bildir("Kaydedildi."); }
                 catch (Exception e) { Ui.Hata(p, e.Message); }
             }, true));
-            p.Controls.Add(new Label { Text = "VERİLER NEREDEN GELİYOR?", AutoSize = true, Font = Ui.Kalin, ForeColor = Ui.Yesil, Margin = new Padding(0, 24, 0, 4) });
-            p.Controls.Add(Ui.Aciklama(
-                "İklim: MGM il derece-günleri · Yönetmelik: TS 825:2024 U sınırları, Binaların Yangından Korunması Hakkında Yönetmelik md. 27 · " +
-                "Malzeme fiyatları: uygulanmış sistem fiyatları (satıcı ve piyasa listeleri, her satırda kaynak ve tarih) · Doğal gaz: BOTAŞ tarifesi · Elektrik: EPDK · " +
-                "Faiz ve enflasyon: TCMB, TÜİK · Karbon: ICE veri tabanı, IPCC. Kaynaklar veri/referans klasöründeki dosyalarda satır satır yazılıdır.", 760));
             return p;
         }
 
@@ -53,7 +48,7 @@ namespace EcoBuildss.UI
                 foreach (var c in new[] { "Ad soyad", "Kullanıcı adı", "Rol", "Durum", "Son giriş" }) liste.Columns.Add(c, c);
                 foreach (var k in d.Db.Kullanicilar())
                 {
-                    int i = liste.Rows.Add(k.AdSoyad, k.KullaniciAdi, k.RolAdi, k.Aktif ? "etkin" : "devre dışı", k.SonGiris?.ToString("dd.MM.yyyy HH:mm") ?? "—");
+                    int i = liste.Rows.Add(k.AdSoyad, k.KullaniciAdi, k.RolAdi, k.Aktif ? "Etkin" : "Pasif", k.SonGiris?.ToString("dd.MM.yyyy HH:mm") ?? "—");
                     liste.Rows[i].Tag = k;
                     if (!k.Aktif) liste.Rows[i].DefaultCellStyle.ForeColor = Ui.Soluk;
                 }
@@ -62,13 +57,12 @@ namespace EcoBuildss.UI
             void Dene(Action a) { try { a(); Doldur(); } catch (Exception e) { Ui.Hata(this, e.Message); } }
 
             var ust = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8, 6, 8, 0) };
-            ust.Controls.Add(Ui.Dugme("Kullanıcı ekle…", (_, __) => Dene(Ekle), true));
-            ust.Controls.Add(Ui.Dugme("Parolayı sıfırla…", (_, __) => { if (Secili() is Kullanici k) Dene(() => Sifirla(k)); }));
-            ust.Controls.Add(Ui.Dugme("Yönetici / satış yap", (_, __) => { if (Secili() is Kullanici k) Dene(() => d.Db!.KullaniciGuncelle(k.Id, k.Yonetici ? Rol.Satis : Rol.Yonetici, k.Aktif)); }));
-            ust.Controls.Add(Ui.Dugme("Etkinleştir / devre dışı bırak", (_, __) => { if (Secili() is Kullanici k) Dene(() => d.Db!.KullaniciGuncelle(k.Id, k.Rol, !k.Aktif)); }));
+            ust.Controls.Add(Ui.Dugme("Ekle", (_, __) => Dene(Ekle), true));
+            ust.Controls.Add(Ui.Dugme("Parola sıfırla", (_, __) => { if (Secili() is Kullanici k) Dene(() => Sifirla(k)); }));
+            ust.Controls.Add(Ui.Dugme("Rol değiştir", (_, __) => { if (Secili() is Kullanici k) Dene(() => d.Db!.KullaniciGuncelle(k.Id, k.Yonetici ? Rol.Satis : Rol.Yonetici, k.Aktif)); }));
+            ust.Controls.Add(Ui.Dugme("Etkin / pasif", (_, __) => { if (Secili() is Kullanici k) Dene(() => d.Db!.KullaniciGuncelle(k.Id, k.Rol, !k.Aktif)); }));
             var p = new Panel();
-            p.Controls.Add(Ui.Kart("Kullanıcılar", liste, "Yönetici: her şey · Satış: teklif hazırlar, kaydeder ve sonucunu işaretler; teklif silemez, veri yükleyemez, kullanıcı ve ayar değiştiremez"));
-            p.Controls.Add(ust);
+            p.Controls.Add(Ui.Kart("Kullanıcılar", liste)); p.Controls.Add(ust);
             VisibleChanged += (_, __) => { if (Visible) Doldur(); };
             return p;
         }
@@ -88,19 +82,19 @@ namespace EcoBuildss.UI
                 catch (Exception e) { mesaj.Text = e.Message; }
             }, true);
             p.Controls.Add(tamam); f.AcceptButton = tamam;
-            if (f.ShowDialog(this) == DialogResult.OK) d.Bildir($"{kad.Text} eklendi. Geçici parolayı kişiye iletin; ilk girişte değiştirmesini isteyin.");
+            if (f.ShowDialog(this) == DialogResult.OK) d.Bildir($"{kad.Text} eklendi.");
         }
 
         void Sifirla(Kullanici k)
         {
-            using var f = Pencere($"Parolayı sıfırla · {k.KullaniciAdi}", 220);
+            using var f = Pencere($"Parola sıfırla · {k.KullaniciAdi}", 220);
             var p = (FlowLayoutPanel)f.Controls[0];
             var par = new TextBox { Width = 300, UseSystemPasswordChar = true };
             var mesaj = new Label { AutoSize = true, MaximumSize = new Size(300, 0), ForeColor = Ui.Kirmizi };
-            p.Controls.Add(Ui.Etiket("Yeni geçici parola")); p.Controls.Add(par); p.Controls.Add(mesaj);
+            p.Controls.Add(Ui.Etiket("Geçici parola")); p.Controls.Add(par); p.Controls.Add(mesaj);
             var tamam = Ui.Dugme("Sıfırla", (_, __) => { try { d.Db!.ParolaSifirla(k.Id, par.Text); f.DialogResult = DialogResult.OK; } catch (Exception e) { mesaj.Text = e.Message; } }, true);
             p.Controls.Add(tamam); f.AcceptButton = tamam;
-            if (f.ShowDialog(this) == DialogResult.OK) d.Bildir($"{k.KullaniciAdi} parolası sıfırlandı; hesap kilidi de açıldı.");
+            if (f.ShowDialog(this) == DialogResult.OK) d.Bildir($"{k.KullaniciAdi}: parola sıfırlandı.");
         }
 
         static Form Pencere(string baslik, int yukseklik)
@@ -110,11 +104,54 @@ namespace EcoBuildss.UI
             return f;
         }
 
-        // ======================= Güvenlik ve yedek =======================
-        Control Guvenlik()
+        // ======================= Günlük =======================
+        Control Gunluk()
+        {
+            var liste = Ui.Izgara();
+            var seviye = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 130 };
+            seviye.Items.AddRange(new object[] { "Tümü", "Bilgi", "Uyarı", "Hata", "Güvenlik" }); seviye.SelectedIndex = 0;
+            var ara = new TextBox { Width = 220 };
+            var durumu = new Label { AutoSize = true, Font = Ui.Kalin, Margin = new Padding(12, 9, 0, 0) };
+            void Doldur()
+            {
+                liste.Columns.Clear(); liste.Rows.Clear();
+                if (d.Db == null || !d.Yonetici) return;
+                foreach (var c in new[] { "Tarih", "Kullanıcı", "Seviye", "İşlem", "Ayrıntı" }) liste.Columns.Add(c, c);
+                liste.Columns[4].FillWeight = 260;
+                Seviye? s = seviye.SelectedIndex switch { 1 => Seviye.Bilgi, 2 => Seviye.Uyari, 3 => Seviye.Hata, 4 => Seviye.Guvenlik, _ => null };
+                string q = ara.Text.Trim();
+                foreach (var g in d.Db.GunlukOku(2000, s))
+                {
+                    if (q.Length > 0 && !(g.Islem + " " + g.Ayrinti + " " + g.Kullanici).ToLower(Ui.TR).Contains(q.ToLower(Ui.TR))) continue;
+                    int i = liste.Rows.Add(g.Tarih.ToString("dd.MM.yyyy HH:mm:ss"), g.Kullanici, g.Seviye, g.Islem, g.Ayrinti);
+                    if (g.Seviye == "Hata") liste.Rows[i].DefaultCellStyle.ForeColor = Ui.Kirmizi;
+                    else if (g.Seviye == "Güvenlik") liste.Rows[i].DefaultCellStyle.ForeColor = Color.FromArgb(140, 90, 20);
+                }
+            }
+            void Denetle(bool kaydet)
+            {
+                var (n, sorun) = d.Db!.GunlukDogrula();
+                durumu.Text = sorun == null ? $"✓ Sağlam ({n:N0} kayıt)" : "✗ " + sorun;
+                durumu.ForeColor = sorun == null ? Ui.Yesil : Ui.Kirmizi;
+                if (kaydet || sorun != null) d.Db.Gunluk("Günlük denetlendi", sorun ?? $"{n} kayıt sağlam", sorun == null ? Seviye.Bilgi : Seviye.Guvenlik);
+            }
+            var ust = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8, 6, 8, 0) };
+            ust.Controls.Add(Ui.Etiket("Seviye")); ust.Controls.Add(seviye); ust.Controls.Add(Ui.Etiket("Ara")); ust.Controls.Add(ara);
+            ust.Controls.Add(Ui.Dugme("Yenile", (_, __) => Doldur()));
+            ust.Controls.Add(Ui.Dugme("Denetle", (_, __) => Denetle(true), true));
+            ust.Controls.Add(durumu);
+            seviye.SelectedIndexChanged += (_, __) => Doldur();
+            ara.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { Doldur(); e.SuppressKeyPress = true; } };
+            var p = new Panel();
+            p.Controls.Add(Ui.Kart("İşlem günlüğü", liste)); p.Controls.Add(ust);
+            p.VisibleChanged += (_, __) => { if (p.Visible) { Doldur(); Denetle(false); } };
+            return p;
+        }
+
+        // ======================= Yedek =======================
+        Control Yedek()
         {
             var yedekler = Ui.Izgara();
-            var zincir = new Label { AutoSize = true, MaximumSize = new Size(560, 0), Font = Ui.Yazi, Margin = new Padding(0, 6, 0, 0) };
             void Doldur()
             {
                 yedekler.Columns.Clear(); yedekler.Rows.Clear();
@@ -122,41 +159,23 @@ namespace EcoBuildss.UI
                 foreach (var c in new[] { "Yedek", "Tarih", "Boyut" }) yedekler.Columns.Add(c, c);
                 foreach (var f in d.Db.Yedekler()) { int i = yedekler.Rows.Add(f.Name, f.LastWriteTime.ToString("dd.MM.yyyy HH:mm"), $"{f.Length / 1024:N0} KB"); yedekler.Rows[i].Tag = f.FullName; }
             }
-            void Dogrula()
-            {
-                var (n, sorun) = d.Db!.GunlukDogrula();
-                zincir.Text = sorun == null ? $"✓ İşlem günlüğü sağlam: {n:N0} kaydın hiçbiri değiştirilmemiş ya da silinmemiş." : $"✗ Günlük zinciri bozuk: {sorun} Veritabanı dosyasına program dışından müdahale edilmiş olabilir.";
-                zincir.ForeColor = sorun == null ? Ui.Yesil : Ui.Kirmizi;
-                d.Db.Gunluk("Günlük bütünlüğü denetlendi", sorun ?? $"{n} kayıt sağlam", sorun == null ? Seviye.Bilgi : Seviye.Guvenlik);
-            }
-
-            var sol = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(4), BackColor = Color.White };
-            sol.Controls.Add(Ui.Aciklama("Her işlem (oturum açma ve kapama, başarısız giriş, teklif kaydı, silme, sonuç, veri yükleme, ayar ve kullanıcı değişikliği, yedek, hata) " +
-                "veritabanındaki işlem günlüğüne kim yaptıysa onun adıyla yazılır. Her kayıt bir öncekinin SHA-256 özetini içerir: bir kayıt sonradan değiştirilir ya da silinirse " +
-                "aşağıdaki denetim bunu bulur. Parolalar PBKDF2-SHA256 (600.000 tekrar, kullanıcıya özel tuz) ile saklanır; 5 hatalı denemede hesap 15 dakika kilitlenir; " +
-                $"{AnaForm.ZamanAsimi.TotalMinutes:0} dakika işlem yapılmazsa oturum kilitlenir.", 560));
-            sol.Controls.Add(Ui.Dugme("Günlük bütünlüğünü denetle", (_, __) => Dogrula(), true));
-            sol.Controls.Add(zincir);
-
-            var yedekPanel = new Panel();
-            var ust = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true };
-            ust.Controls.Add(Ui.Dugme("Şimdi yedekle", (_, __) => { try { var y = d.Db!.Yedekle(); Doldur(); d.Bildir("Yedek alındı: " + Path.GetFileName(y)); } catch (Exception e) { d.Hata("Yedek alınamadı: " + e.Message, e); } }, true));
-            ust.Controls.Add(Ui.Dugme("Seçili yedeği geri yükle…", (_, __) =>
+            var ust = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(8, 6, 8, 0) };
+            ust.Controls.Add(Ui.Dugme("Yedekle", (_, __) => { try { var y = d.Db!.Yedekle(); Doldur(); d.Bildir("Yedek alındı."); } catch (Exception e) { d.Hata("Yedek alınamadı: " + e.Message, e); } }, true));
+            ust.Controls.Add(Ui.Dugme("Geri yükle", (_, __) =>
             {
                 if (yedekler.CurrentRow?.Tag is not string yol) return;
-                if (MessageBox.Show(this, $"{Path.GetFileName(yol)} geri yüklensin mi?\n\nŞu anki veriler önce ayrıca yedeklenir; yine de bu yedekten sonra yapılan kayıtlar ekrandan kalkar.",
-                        "Geri yükle", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
-                try { d.Db!.GeriYukle(yol); Doldur(); d.TekliflerDegistiDuyur(); d.ModelleriKur(); d.Bildir("Yedekten geri yüklendi: " + Path.GetFileName(yol)); }
+                if (MessageBox.Show(this, $"{Path.GetFileName(yol)} geri yüklensin mi?", "Geri yükle", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+                try { d.Db!.GeriYukle(yol); GeriYuklendi?.Invoke(); }
                 catch (Exception e) { d.Hata("Geri yüklenemedi: " + e.Message, e); Ui.Hata(this, "Geri yüklenemedi: " + e.Message); }
             }));
-            ust.Controls.Add(Ui.Dugme("Yedek klasörünü aç", (_, __) => { try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(d.Db!.YedekKlasoru) { UseShellExecute = true }); } catch { } }));
-            yedekPanel.Controls.Add(yedekler); yedekler.Dock = DockStyle.Fill; yedekPanel.Controls.Add(ust);
-
-            var iz = Ui.Izgara2(2, 45, 55);
-            iz.Controls.Add(Ui.Kart("İşlem günlüğü ve parola güvenliği", sol), 0, 0);
-            iz.Controls.Add(Ui.Kart("Yedekler", yedekPanel, $"Program her gün ilk açılışta otomatik yedek alır; son {Veritabani.YedekSaklamaGun} günün yedeği saklanır"), 1, 0);
-            VisibleChanged += (_, __) => { if (Visible) Doldur(); };
-            return iz;
+            ust.Controls.Add(Ui.Dugme("Klasör", (_, __) => { try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(d.Db!.YedekKlasoru) { UseShellExecute = true }); } catch { } }));
+            var p = new Panel();
+            p.Controls.Add(Ui.Kart("Yedekler", yedekler)); p.Controls.Add(ust);
+            p.VisibleChanged += (_, __) => { if (p.Visible) Doldur(); };
+            return p;
         }
+
+        /// <summary>Yedekten geri yüklenince yeniden oturum açılmalı (yedekteki kullanıcılar ve anahtarlar geçerli olur).</summary>
+        public event Action? GeriYuklendi;
     }
 }

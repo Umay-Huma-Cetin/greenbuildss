@@ -3,10 +3,10 @@ E1,"Doğalgaz konut fiyatı (BOTAŞ, Kademe-1)",10.625,TL/Sm³,BOTAŞ toptan sat
 E2,"Doğalgaz konut fiyatı (BOTAŞ, Kademe-2, limit aşımı)",18.0,TL/Sm³,BOTAŞ toptan satış tarifesi
 E3,Doğalgaz üst ısıl değer (fatura referansı),9155.0,kcal/Sm³,EPDK – Doğal Gaz Dağıtım Şirketlerinin Perakende Satışlarında Fiili Üst Isıl Değerin Uygulanması Hakkında Tebliğ (Md. 4-5)
 E8,Doğalgaz yanma emisyon faktörü,56.1,tCO₂/TJ,"IPCC 2006 Kılavuzu, sabit yanma, Cilt 2 Bölüm 2 Çizelge 2.5 (konut), doğal gaz Tier 1 değeri"
-M1,Veri seti binalarının duvar U değeri,1.78,W/m²K,"Tsanas, A. ve Xifara, A. (2012), Energy and Buildings 49, 560-567"
-M2,Veri seti binalarının döşeme U değeri,0.86,W/m²K,"Tsanas, A. ve Xifara, A. (2012), Energy and Buildings 49, 560-567"
-M3,Veri seti binalarının çatı U değeri,0.5,W/m²K,"Tsanas, A. ve Xifara, A. (2012), Energy and Buildings 49, 560-567"
-M4,Veri seti binalarının pencere U değeri,2.26,W/m²K,"Tsanas, A. ve Xifara, A. (2012), Energy and Buildings 49, 560-567"
+M1,Yalıtımsız mevcut konutun dış duvar U değeri,1.31,W/m²K,"Mıhlayanlar, E. ve Meral, S. (2023), ""Mevcut Binalarda Enerji Verimli Yenileme ve EKB Uygulaması"", Kırklareli Üniv. Müh. ve Fen Bil. Derg. 9(2), 478-497, doi:10.34186/klujes.1379762 — Edirne, yalıtımsız mevcut konut, BEP-TR2 girdileri"
+M2,Yalıtımsız mevcut konutun döşeme U değeri,3.09,W/m²K,"Mıhlayanlar, E. ve Meral, S. (2023), ""Mevcut Binalarda Enerji Verimli Yenileme ve EKB Uygulaması"", Kırklareli Üniv. Müh. ve Fen Bil. Derg. 9(2), 478-497, doi:10.34186/klujes.1379762 — Edirne, yalıtımsız mevcut konut, BEP-TR2 girdileri"
+M3,Yalıtımsız mevcut konutun tavan/çatı U değeri,2.75,W/m²K,"Mıhlayanlar, E. ve Meral, S. (2023), ""Mevcut Binalarda Enerji Verimli Yenileme ve EKB Uygulaması"", Kırklareli Üniv. Müh. ve Fen Bil. Derg. 9(2), 478-497, doi:10.34186/klujes.1379762 — Edirne, yalıtımsız mevcut konut, BEP-TR2 girdileri"
+M4,Mevcut konutun pencere U değeri,2.7,W/m²K,"Mıhlayanlar, E. ve Meral, S. (2023), ""Mevcut Binalarda Enerji Verimli Yenileme ve EKB Uygulaması"", Kırklareli Üniv. Müh. ve Fen Bil. Derg. 9(2), 478-497, doi:10.34186/klujes.1379762 — Edirne, yalıtımsız mevcut konut, BEP-TR2 girdileri"
 M7,Kat yüksekliği,3.5,m,ENB2012 verisinden türetildi
 T6,Rsi + Rse (dış duvar),0.17,m²K/W,"TS 825 (iç 0,13 + dış 0,04)"
 V1,"Hava değişim sayısı nh (uygunluk belgeli pencere, doğal havalandırma)",1.0,1/h,"TS 825 – C. Yılmaz, ME401 Bölüm 3 Binalarda Isı Yalıtım Kuralları (TS 825), Afyon Kocatepe Üniv., 2017: uygunluk belgeli pencerede nh = 1 (blog.aku.edu.tr/ceyhunyilmaz/files/2017/02/ME401-Chap_03_lecture.pdf)"

@@ -6,8 +6,9 @@ C# çekirdeğinin ürettiği sonuçlar, aynı veri dosyalarından tamamen ayrı 
   2) İl kümelemesi (k-means, Davies–Bouldin, siluet) → C# ile aynı k ve aynı ölçüler
   3) Teklif kabul sınıflandırması                    → farklı kod, farklı rastgele bölme: başarı aynı düzeyde olmalı
 
-Kullanım:  python araclar/dogrulama/bagimsiz_dogrulama.py [veri_klasoru]
-Varsayılan veri klasörü veri/ornek; gerçek veriniz varsa aynı adlı dosyaları içeren klasörü verin.
+Kullanım:  python araclar/dogrulama/bagimsiz_dogrulama.py <veri_klasoru>
+Klasörde tuketim_kayitlari.csv ve teklif_gecmisi.csv bulunmalı (gerçek veriniz ya da
+`dotnet run --project tests/EcoBuildss.Tests -- --ornek-yaz <klasör>` ile yazılan test verisi).
 """
 import sys, pathlib
 import numpy as np, pandas as pd
@@ -20,7 +21,9 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
 
 KOK = pathlib.Path(__file__).resolve().parents[2]
-VERI = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else KOK / "veri" / "ornek"
+if len(sys.argv) < 2:
+    sys.exit("Kullanım: python araclar/dogrulama/bagimsiz_dogrulama.py <veri_klasoru>")
+VERI = pathlib.Path(sys.argv[1])
 REF = KOK / "veri" / "referans"
 
 p = pd.read_csv(REF / "parametreler.csv").set_index("id")["deger"].astype(float)

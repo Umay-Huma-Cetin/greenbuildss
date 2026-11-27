@@ -11,7 +11,6 @@ namespace EcoBuildss.UI
         public static readonly TimeSpan ZamanAsimi = TimeSpan.FromMinutes(15);
         readonly Durum d;
         readonly Label durumYazisi = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Font = Ui.Kucuk, ForeColor = Ui.Soluk, Padding = new Padding(10, 0, 0, 0) };
-        readonly Label ornekUyari = new() { Dock = DockStyle.Bottom, Height = 40, Text = "Örnek (sentetik) veri yüklü", Font = Ui.Kucuk, BackColor = Ui.Amber, ForeColor = Ui.Koyu, TextAlign = ContentAlignment.MiddleCenter, Visible = false };
         readonly Label kullaniciEtiket = new() { Dock = DockStyle.Top, Height = 40, Font = Ui.Kalin, ForeColor = Color.White, Padding = new Padding(18, 4, 0, 0) };
         readonly Panel icerik = new() { Dock = DockStyle.Fill, BackColor = Ui.Zemin };
         readonly List<Button> menu = new();
@@ -52,10 +51,10 @@ namespace EcoBuildss.UI
             var oturum = new Panel { Dock = DockStyle.Bottom, Height = 104, BackColor = Color.FromArgb(14, 30, 24), Padding = new Padding(0, 6, 0, 0) };
             var linkler = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, Padding = new Padding(16, 0, 0, 0) };
             LinkLabel Link(string t, Action a) { var l = new LinkLabel { Text = t, AutoSize = true, LinkColor = Color.FromArgb(185, 206, 196), ActiveLinkColor = Color.White, Font = Ui.Kucuk, Margin = new Padding(2, 2, 0, 2) }; l.LinkClicked += (_, __) => a(); return l; }
-            linkler.Controls.Add(Link("Parola değiştir", ParolaDegistir));
-            linkler.Controls.Add(Link("Oturumu kapat", () => Kilitle("çıkış", "Oturum kapatıldı. Devam etmek için yeniden oturum açın.")));
+            linkler.Controls.Add(Link("Parola", ParolaDegistir));
+            linkler.Controls.Add(Link("Çıkış", () => Kilitle("çıkış", "Oturum kapatıldı.")));
             oturum.Controls.Add(linkler); oturum.Controls.Add(kullaniciEtiket);
-            yan.Controls.Add(liste); yan.Controls.Add(ornekUyari); yan.Controls.Add(oturum); yan.Controls.Add(logo);
+            yan.Controls.Add(liste); yan.Controls.Add(oturum); yan.Controls.Add(logo);
 
             var alt = new Panel { Dock = DockStyle.Bottom, Height = 26, BackColor = Color.White };
             alt.Controls.Add(durumYazisi);
@@ -70,12 +69,13 @@ namespace EcoBuildss.UI
                 if (t.ProjeTuru == "Yenileme") { Goster(1); apartman.Yukle(t); }
                 else { Goster(2); teklif.Yukle(t); }
             };
-            ekranlar.AddRange(new Control[] { ana, apartman, teklif, kayitlar, new YoneticiSekmesi(d) });
+            var yonetim = new YoneticiSekmesi(d);
+            yonetim.GeriYuklendi += () => Kilitle("geri yükleme", "Yedek geri yüklendi. Yeniden giriş yapın.");
+            ekranlar.AddRange(new Control[] { ana, apartman, teklif, kayitlar, yonetim });
             foreach (var e in ekranlar) { e.Dock = DockStyle.Fill; e.Visible = false; icerik.Controls.Add(e); }
 
             Controls.Add(icerik); Controls.Add(alt); Controls.Add(yan);
 
-            d.ModellerDegisti += () => ornekUyari.Visible = d.OrnekVeriKullaniliyor;
             Shown += (_, __) =>
             {
                 d.ModelleriKur();
@@ -86,7 +86,7 @@ namespace EcoBuildss.UI
                 Application.AddMessageFilter(this);
                 bekleme.Start();
             };
-            bekleme.Tick += (_, __) => { if (DateTime.Now - sonEtkinlik > ZamanAsimi && d.Kullanici != null) Kilitle("zaman aşımı", $"{ZamanAsimi.TotalMinutes:0} dakika işlem yapılmadığı için oturum kilitlendi."); };
+            bekleme.Tick += (_, __) => { if (DateTime.Now - sonEtkinlik > ZamanAsimi && d.Kullanici != null) Kilitle("zaman aşımı", "Oturum zaman aşımına uğradı."); };
             KeyDown += (_, e) =>
             {
                 if (e.Control && e.KeyCode == Keys.S) { if (ekranlar[1].Visible) apartman.Kaydet(); else if (ekranlar[2].Visible) teklif.Kaydet(); e.Handled = true; }
@@ -114,7 +114,7 @@ namespace EcoBuildss.UI
 
         void Goster(int i)
         {
-            if (i == 4 && !d.Yonetici) { d.Bildir("Veri ve modeller yalnız yönetici yetkisiyle açılır."); return; }
+            if (i == 4 && !d.Yonetici) { d.Bildir("Yetkiniz yok."); return; }
             aktifEkran = i;
             for (int k = 0; k < ekranlar.Count; k++)
             {

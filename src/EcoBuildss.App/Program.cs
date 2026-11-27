@@ -44,7 +44,13 @@ namespace EcoBuildss.UI
                 return null;
             }
             d.Db.Gunluk("Program açıldı", $"sürüm {typeof(Program).Assembly.GetName().Version} · {Environment.MachineName}");
-            try { if (d.Db.OtomatikYedek() is string y) d.Bildir("Günlük otomatik yedek alındı: " + Path.GetFileName(y)); }
+            var bozuk = ReferansButunluk.Denetle(d.Referans);
+            if (bozuk.Count > 0)
+            {
+                d.Db.Gunluk("Referans veri değiştirilmiş", string.Join("; ", bozuk), Seviye.Guvenlik);
+                MessageBox.Show("Referans veri dosyaları değiştirilmiş:\n\n" + string.Join("\n", bozuk.Take(5)) + "\n\nHesaplar güvenilir değil. Programı yeniden kurun.", "EcoBuildss", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            try { if (d.Db.OtomatikYedek() is string y) d.Bildir("Yedek alındı."); }
             catch (Exception e) { d.Hata("Otomatik yedek alınamadı: " + e.Message, e); }
             using var g = new GirisFormu(d.Db);
             return g.ShowDialog() == DialogResult.OK ? d : null;
