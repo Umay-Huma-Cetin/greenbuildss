@@ -19,6 +19,7 @@ namespace EcoBuildss.Core.Depo
         public string YalitimId = "", CamId = "", DuvarId = "", Dograma = "", Yakit = "DG";
         public double En, Boy, KatYuksekligi, CamOrani; public int KatSayisi; public bool Sogutma;
         public int DaireSayisi;   // apartman mantolamasında daire başına paylaşım için
+        public string Hazirlayan = "";   // teklifi kaydeden kullanıcı
         public string Sonuc = "Bekliyor";   // Bekliyor / Kabul / Red
     }
 
@@ -26,7 +27,7 @@ namespace EcoBuildss.Core.Depo
     /// Operasyonel veritabanı (SQLite): içe aktarılan gerçek veri, kaydedilen teklifler ve sonuçları, model çalıştırma geçmişi, işlem günlüğü.
     /// Referans veri (iklim, yönetmelik, fiyat) kaynak gösterimli CSV dosyalarında kalır ve değiştirilmez.
     /// </summary>
-    public sealed class Veritabani : IDisposable
+    public sealed partial class Veritabani : IDisposable
     {
         readonly SqliteBaglanti b;
         public string Dosya => b.Dosya;
@@ -52,15 +53,17 @@ CREATE TABLE IF NOT EXISTS ayarlar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NUL
             // Eski sürümden gelen veritabanına yeni sütun eklenir (varsa hata yok sayılır)
             if (!b.Sorgu("PRAGMA table_info(teklifler)").Any(r => (string?)r["name"] == "daire_sayisi"))
                 b.Calistir("ALTER TABLE teklifler ADD COLUMN daire_sayisi INTEGER NOT NULL DEFAULT 0");
+            if (!b.Sorgu("PRAGMA table_info(teklifler)").Any(r => (string?)r["name"] == "hazirlayan"))
+                b.Calistir("ALTER TABLE teklifler ADD COLUMN hazirlayan TEXT NOT NULL DEFAULT ''");
+            GuvenlikKur();
         }
 
-        public void Gunluk(string islem, string ayrinti = "") =>
-            b.Yaz("INSERT INTO islem_gunlugu (tarih, islem, ayrinti) VALUES (@t, @i, @a)", new Dictionary<string, object?> { ["t"] = DateTime.Now, ["i"] = islem, ["a"] = ayrinti });
 
         // ---------------- İçe aktarılan veri ----------------
         /// <summary>Denetimden geçmiş kayıtları saklar. Aynı anahtar varsa güncellenir. Gerçek ve örnek veri karıştırılmaz: biri yüklenince öteki silinir.</summary>
         public int VeriKaydet(Sema sema, IEnumerable<Kayit> kayitlar, bool ornek)
         {
+            Yetki(yonetici: true, "Veri içe aktarma");
             string kaynak = ornek ? "Örnek" : "Gerçek";
             int n = 0;
             b.Islem(() =>
@@ -92,22 +95,24 @@ CREATE TABLE IF NOT EXISTS ayarlar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NUL
             return (IceAktarici.Metinden(sb.ToString(), sema), kaynak);
         }
 
-        public void VeriSil(Sema sema) { b.Yaz("DELETE FROM veri_kayitlari WHERE veri_seti = @s", new Dictionary<string, object?> { ["s"] = sema.DosyaAdi }); Gunluk("Veri silindi", sema.Ad); }
+        public void VeriSil(Sema sema) { Yetki(yonetici: true, "Veri silme"); b.Yaz("DELETE FROM veri_kayitlari WHERE veri_seti = @s", new Dictionary<string, object?> { ["s"] = sema.DosyaAdi }); Gunluk("Veri silindi", sema.Ad); }
 
         // ---------------- Teklifler ----------------
         public long TeklifKaydet(KayitliTeklif t)
         {
+            Yetki(yonetici: false, "Teklif kaydetme");
+            t.Hazirlayan = Aktif!.KullaniciAdi;
             var p = new Dictionary<string, object?>
             {
                 ["no"] = t.TeklifNo, ["tarih"] = t.Tarih.ToString("yyyy-MM-dd"), ["musteri"] = t.Musteri, ["mt"] = t.MusteriTipi, ["il"] = t.Il, ["pt"] = t.ProjeTuru,
                 ["alan"] = t.KullanimAlani, ["paket"] = t.Paket, ["onc"] = t.Oncelik, ["y"] = t.YalitimId, ["c"] = t.CamId, ["d"] = t.DuvarId, ["dog"] = t.Dograma,
                 ["yak"] = t.Yakit, ["en"] = t.En, ["boy"] = t.Boy, ["kat"] = t.KatSayisi, ["kh"] = t.KatYuksekligi, ["co"] = t.CamOrani, ["sog"] = t.Sogutma,
                 ["tl"] = t.TeklifTL, ["tlm2"] = t.TeklifTLm2, ["go"] = t.GeriOdemeYil, ["ind"] = t.IndirimOrani, ["yan"] = t.YanitSuresiGun, ["rak"] = t.RakipTeklif,
-                ["ko"] = t.KabulOlasiligi, ["son"] = t.Sonuc, ["ds"] = t.DaireSayisi,
+                ["ko"] = t.KabulOlasiligi, ["son"] = t.Sonuc, ["ds"] = t.DaireSayisi, ["haz"] = t.Hazirlayan,
             };
             t.Id = b.Yaz(@"INSERT INTO teklifler (teklif_no, tarih, musteri, musteri_tipi, il, proje_turu, kullanim_alani, paket, oncelik, yalitim_id, cam_id, duvar_id, dograma, yakit,
-                en, boy, kat_sayisi, kat_yuksekligi, cam_orani, sogutma, teklif_tl, teklif_tl_m2, geri_odeme_yil, indirim_orani, yanit_suresi_gun, rakip_teklif, kabul_olasiligi, sonuc, daire_sayisi)
-                VALUES (@no, @tarih, @musteri, @mt, @il, @pt, @alan, @paket, @onc, @y, @c, @d, @dog, @yak, @en, @boy, @kat, @kh, @co, @sog, @tl, @tlm2, @go, @ind, @yan, @rak, @ko, @son, @ds)", p);
+                en, boy, kat_sayisi, kat_yuksekligi, cam_orani, sogutma, teklif_tl, teklif_tl_m2, geri_odeme_yil, indirim_orani, yanit_suresi_gun, rakip_teklif, kabul_olasiligi, sonuc, daire_sayisi, hazirlayan)
+                VALUES (@no, @tarih, @musteri, @mt, @il, @pt, @alan, @paket, @onc, @y, @c, @d, @dog, @yak, @en, @boy, @kat, @kh, @co, @sog, @tl, @tlm2, @go, @ind, @yan, @rak, @ko, @son, @ds, @haz)", p);
             Gunluk("Teklif kaydedildi", $"{t.TeklifNo} · {t.Il} · {t.Paket} · {t.TeklifTL:N0} TL");
             return t.Id;
         }
@@ -115,11 +120,21 @@ CREATE TABLE IF NOT EXISTS ayarlar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NUL
         public void SonucIsaretle(long id, string sonuc)
         {
             if (sonuc != "Bekliyor" && sonuc != "Kabul" && sonuc != "Red") throw new ArgumentException("Sonuç Bekliyor, Kabul ya da Red olmalı.");
+            Yetki(yonetici: false, "Teklif sonucu işaretleme");
+            string no = TeklifNo(id);
             b.Yaz("UPDATE teklifler SET sonuc = @s WHERE id = @id", new Dictionary<string, object?> { ["s"] = sonuc, ["id"] = id });
-            Gunluk("Teklif sonucu", $"#{id} → {sonuc}");
+            Gunluk("Teklif sonucu", $"{no} → {sonuc}");
         }
 
-        public void TeklifSil(long id) { b.Yaz("DELETE FROM teklifler WHERE id = @id", new Dictionary<string, object?> { ["id"] = id }); Gunluk("Teklif silindi", $"#{id}"); }
+        public void TeklifSil(long id)
+        {
+            Yetki(yonetici: true, "Teklif silme");
+            var t = Teklifler().FirstOrDefault(x => x.Id == id);
+            b.Yaz("DELETE FROM teklifler WHERE id = @id", new Dictionary<string, object?> { ["id"] = id });
+            Gunluk("Teklif silindi", t == null ? $"#{id}" : $"{t.TeklifNo} · {t.Musteri} · {t.Il} · {t.TeklifTL:N0} TL", Seviye.Uyari);
+        }
+
+        string TeklifNo(long id) => b.Sorgu("SELECT teklif_no FROM teklifler WHERE id = @id", new Dictionary<string, object?> { ["id"] = id }).Select(r => S(r["teklif_no"])).FirstOrDefault() ?? $"#{id}";
 
         public List<KayitliTeklif> Teklifler() => b.Sorgu("SELECT * FROM teklifler ORDER BY tarih DESC, id DESC").Select(r => new KayitliTeklif
         {
@@ -129,7 +144,7 @@ CREATE TABLE IF NOT EXISTS ayarlar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NUL
             En = D(r["en"]), Boy = D(r["boy"]), KatSayisi = (int)(r["kat_sayisi"] as long? ?? 1), KatYuksekligi = D(r["kat_yuksekligi"]), CamOrani = D(r["cam_orani"]), Sogutma = (r["sogutma"] as long?) == 1,
             TeklifTL = D(r["teklif_tl"]), TeklifTLm2 = D(r["teklif_tl_m2"]), GeriOdemeYil = r["geri_odeme_yil"] == null ? null : D(r["geri_odeme_yil"]),
             IndirimOrani = D(r["indirim_orani"]), YanitSuresiGun = D(r["yanit_suresi_gun"]), RakipTeklif = (r["rakip_teklif"] as long?) == 1,
-            KabulOlasiligi = r["kabul_olasiligi"] == null ? null : D(r["kabul_olasiligi"]), Sonuc = S(r["sonuc"]), DaireSayisi = (int)(r["daire_sayisi"] as long? ?? 0),
+            KabulOlasiligi = r["kabul_olasiligi"] == null ? null : D(r["kabul_olasiligi"]), Sonuc = S(r["sonuc"]), DaireSayisi = (int)(r["daire_sayisi"] as long? ?? 0), Hazirlayan = S(r["hazirlayan"]),
         }).ToList();
 
         /// <summary>Sonucu belli olan (kabul/red) kayıtlı teklifler, teklif geçmişi şemasında satır olarak — modeli firmanın kendi sonuçlarıyla besler.</summary>
@@ -159,8 +174,12 @@ CREATE TABLE IF NOT EXISTS ayarlar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NUL
             var r = b.Sorgu("SELECT deger FROM ayarlar WHERE anahtar = @a", new Dictionary<string, object?> { ["a"] = anahtar });
             return r.Count == 0 ? varsayilan : (string)r[0]["deger"]!;
         }
-        public void AyarYaz(string anahtar, string deger) =>
+        public void AyarYaz(string anahtar, string deger)
+        {
+            Yetki(yonetici: true, "Firma bilgilerini değiştirme");
+            Gunluk("Ayar değişti", $"{anahtar} = {deger}");
             b.Yaz("INSERT OR REPLACE INTO ayarlar (anahtar, deger) VALUES (@a, @d)", new Dictionary<string, object?> { ["a"] = anahtar, ["d"] = deger });
+        }
 
         // ---------------- Model çalışmaları ----------------
         public void ModelKaydet(string model, string kaynak, int n, string ozet) =>
@@ -168,7 +187,7 @@ CREATE TABLE IF NOT EXISTS ayarlar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NUL
                   new Dictionary<string, object?> { ["t"] = DateTime.Now, ["m"] = model, ["k"] = kaynak, ["n"] = n, ["o"] = ozet });
 
         public List<Dictionary<string, object?>> ModelGecmisi() => b.Sorgu("SELECT tarih, model, veri_kaynagi, kayit_sayisi, ozet FROM model_calismalari ORDER BY id DESC LIMIT 200");
-        public List<Dictionary<string, object?>> GunlukOku(int n = 200) => b.Sorgu($"SELECT tarih, islem, ayrinti FROM islem_gunlugu ORDER BY id DESC LIMIT {n}");
+
 
         static string S(object? o) => o?.ToString() ?? "";
         static double D(object? o) => o switch { double d => d, long l => l, _ => 0 };

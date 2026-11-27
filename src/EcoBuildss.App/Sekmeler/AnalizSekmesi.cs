@@ -128,7 +128,7 @@ namespace EcoBuildss.UI
                 Ciz(artis, Core.Duyarlilik.EnerjiArtisi(d.V, g), 100 * g.EnerjiArtisi, x => x.ToString("0.#", Ui.TR) + "%");
                 Ciz(sure, Core.Duyarlilik.AnalizSuresi(d.V, g), g.Yil, x => x.ToString("0", Ui.TR) + " yıl");
             }
-            catch (Exception e) { d.Bildir("Duyarlılık hesaplanamadı: " + e.Message); }
+            catch (Exception e) { d.Hata("Duyarlılık hesaplanamadı: " + e.Message, e); }
         }
 
         void MonteCarlo()

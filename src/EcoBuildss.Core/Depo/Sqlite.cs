@@ -40,16 +40,19 @@ namespace EcoBuildss.Core.Depo
         [DllImport(Lib)] static extern int sqlite3_column_bytes(IntPtr stmt, int i);
         [DllImport(Lib)] static extern IntPtr sqlite3_errmsg(IntPtr db);
         [DllImport(Lib)] static extern long sqlite3_last_insert_rowid(IntPtr db);
+        [DllImport(Lib)] static extern IntPtr sqlite3_backup_init(IntPtr hedef, byte[] hedefAd, IntPtr kaynak, byte[] kaynakAd);
+        [DllImport(Lib)] static extern int sqlite3_backup_step(IntPtr yedek, int sayfa);
+        [DllImport(Lib)] static extern int sqlite3_backup_finish(IntPtr yedek);
 
         IntPtr db;
         public string Dosya { get; }
 
-        public SqliteBaglanti(string dosya)
+        public SqliteBaglanti(string dosya, bool pragmasiz = false)
         {
             Dosya = dosya;
             int rc = sqlite3_open_v2(Utf8(dosya), out db, 0x02 | 0x04, IntPtr.Zero);   // READWRITE | CREATE
             if (rc != OK) { string m = Hata(); sqlite3_close_v2(db); db = IntPtr.Zero; throw new InvalidOperationException($"Veritabanı açılamadı ({dosya}): {m}"); }
-            Calistir("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;");
+            if (!pragmasiz) Calistir("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;");
         }
 
         static byte[] Utf8(string s) { var b = Encoding.UTF8.GetBytes(s); Array.Resize(ref b, b.Length + 1); return b; }
@@ -129,6 +132,21 @@ namespace EcoBuildss.Core.Depo
             }
             finally { sqlite3_finalize(st); }
             return l;
+        }
+
+        /// <summary>
+        /// SQLite çevrimiçi yedekleme API'si: veritabanı açıkken tutarlı bir kopya çıkarır (kaynak → hedef).
+        /// geriYukle = true ise yön tersine döner: dosyadaki yedek bu bağlantının veritabanına yazılır.
+        /// </summary>
+        public void Yedekle(string dosya, bool geriYukle = false)
+        {
+            using var diger = new SqliteBaglanti(dosya, pragmasiz: true);
+            IntPtr hedef = geriYukle ? db : diger.db, kaynak = geriYukle ? diger.db : db;
+            IntPtr y = sqlite3_backup_init(hedef, Utf8("main"), kaynak, Utf8("main"));
+            if (y == IntPtr.Zero) throw new InvalidOperationException("Yedekleme başlatılamadı: " + (geriYukle ? Hata() : diger.Hata()));
+            int rc = sqlite3_backup_step(y, -1);
+            sqlite3_backup_finish(y);
+            if (rc != DONE) throw new InvalidOperationException($"Yedekleme tamamlanamadı (kod {rc}).");
         }
 
         public void Islem(Action a)

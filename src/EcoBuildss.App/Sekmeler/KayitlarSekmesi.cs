@@ -14,6 +14,10 @@ namespace EcoBuildss.UI
         readonly Label[] kpi = Enumerable.Range(0, 4).Select(_ => new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 18f), ForeColor = Ui.Koyu }).ToArray();
         readonly Label[] kpiAlt = Enumerable.Range(0, 4).Select(_ => new Label { AutoSize = true, Font = Ui.Kucuk, ForeColor = Ui.Soluk }).ToArray();
         public event Action<KayitliTeklif>? TeklifeYukle;
+        readonly Button silDugmesi;
+
+        /// <summary>Teklif silme yalnız yöneticiye açıktır (veritabanı katmanı da ayrıca denetler).</summary>
+        public void YetkiyiYansit() => silDugmesi.Visible = d.Yonetici;
 
         public KayitlarSekmesi(Durum durum)
         {
@@ -23,7 +27,8 @@ namespace EcoBuildss.UI
             ust.Controls.Add(Ui.Dugme("Reddedildi", (_, __) => Isaretle("Red")));
             ust.Controls.Add(Ui.Dugme("Bekliyor", (_, __) => Isaretle("Bekliyor")));
             ust.Controls.Add(Ui.Dugme("Teklif ekranında aç", (_, __) => { if (Secili() is KayitliTeklif t) TeklifeYukle?.Invoke(t); }));
-            ust.Controls.Add(Ui.Dugme("Sil", (_, __) => Sil()));
+            silDugmesi = Ui.Dugme("Sil", (_, __) => Sil());
+            ust.Controls.Add(silDugmesi);
             ust.Controls.Add(ozet);
             var bant = new TableLayoutPanel { Dock = DockStyle.Top, Height = 92, ColumnCount = 4, BackColor = Color.White, Padding = new Padding(16, 10, 10, 6) };
             string[] bas = { "BEKLEYEN TEKLİF", "KAZANMA ORANI", "KAZANILAN İŞ (KDV HARİÇ)", "SON 30 GÜN" };
@@ -48,13 +53,13 @@ namespace EcoBuildss.UI
         {
             liste.Columns.Clear(); liste.Rows.Clear();
             if (d.Db == null) { ozet.Text = "Veritabanı açılamadı: " + d.DbHatasi; return; }
-            foreach (var c in new[] { "Teklif no", "Tarih", "Müşteri / apartman", "Tip", "İl", "İş", "Alan (m²)", "Paket", "Teklif (KDV hariç)", "TL/m²", "Geri ödeme", "Kazanma olasılığı", "Sonuç" }) liste.Columns.Add(c, c);
+            foreach (var c in new[] { "Teklif no", "Tarih", "Müşteri / apartman", "Tip", "İl", "İş", "Alan (m²)", "Paket", "Teklif (KDV hariç)", "TL/m²", "Geri ödeme", "Kazanma olasılığı", "Sonuç", "Hazırlayan" }) liste.Columns.Add(c, c);
             var l = d.Db.Teklifler();
             foreach (var t in l)
             {
                 int i = liste.Rows.Add(t.TeklifNo, t.Tarih.ToString("dd.MM.yyyy"), t.Musteri, t.MusteriTipi, t.Il, t.ProjeTuru == "Yenileme" ? (t.DaireSayisi > 0 ? $"Mantolama · {t.DaireSayisi} daire" : "Mantolama") : "Yeni bina", Ui.Sayi(t.KullanimAlani), t.Paket, Ui.Tl(t.TeklifTL),
                                        Ui.Sayi(t.TeklifTLm2), t.GeriOdemeYil.HasValue ? Ui.Sayi(t.GeriOdemeYil.Value, "0.0") + " yıl" : "—",
-                                       t.KabulOlasiligi.HasValue ? Ui.Olasilik(t.KabulOlasiligi.Value) : "—", t.Sonuc);
+                                       t.KabulOlasiligi.HasValue ? Ui.Olasilik(t.KabulOlasiligi.Value) : "—", t.Sonuc, t.Hazirlayan);
                 liste.Rows[i].Tag = t;
                 liste.Rows[i].Cells[12].Style.ForeColor = t.Sonuc == "Kabul" ? Ui.Yesil : t.Sonuc == "Red" ? Ui.Kirmizi : Ui.Soluk;
             }
@@ -72,7 +77,7 @@ namespace EcoBuildss.UI
         void Isaretle(string sonuc)
         {
             if (Secili() is not KayitliTeklif t || d.Db == null) return;
-            d.Db.SonucIsaretle(t.Id, sonuc);
+            try { d.Db.SonucIsaretle(t.Id, sonuc); } catch (UnauthorizedAccessException e) { Ui.Hata(this, e.Message); return; }
             Doldur();
             d.ModelleriKur();
             d.Bildir($"{t.TeklifNo}: {sonuc}. Kabul tahmini modeli güncellendi.");
@@ -82,7 +87,8 @@ namespace EcoBuildss.UI
         {
             if (Secili() is not KayitliTeklif t || d.Db == null) return;
             if (MessageBox.Show(this, $"{t.TeklifNo} silinsin mi? Bu işlem geri alınamaz.", "Sil", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
-            d.Db.TeklifSil(t.Id); Doldur(); d.ModelleriKur();
+            try { d.Db.TeklifSil(t.Id); } catch (UnauthorizedAccessException e) { Ui.Hata(this, e.Message); return; }
+            Doldur(); d.ModelleriKur();
         }
     }
 }

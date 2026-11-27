@@ -214,7 +214,7 @@ namespace EcoBuildss.UI
                     : paketler.FirstOrDefault(p => p.Ad == onceki?.Ad) ?? paketler[1]);
                 if (uygunYok) d.Bildir("Bu binada hiçbir paket TS 825 sınırlarını sağlamıyor; en yakın paketler gösteriliyor.");
             }
-            catch (Exception e) { d.Bildir("Hesap yapılamadı: " + e.Message); }
+            catch (Exception e) { d.Hata("Hesap yapılamadı: " + e.Message, e); }
         }
 
         PaketTeklifi PaketHesapla(string ad, Secenek s)
@@ -369,7 +369,7 @@ namespace EcoBuildss.UI
                 RakipTeklif = rakip.Checked, KabulOlasiligi = secili.KabulOlasiligi,
             };
             try { d.Db.TeklifKaydet(t); d.TekliflerDegistiDuyur(); d.Bildir($"{t.TeklifNo} kaydedildi. Sonucu belli olunca Tekliflerim ekranında Kabul/Red işaretleyin."); }
-            catch (Exception e) { Ui.Hata(this, "Kaydedilemedi: " + e.Message); }
+            catch (Exception e) { d.Hata("Kaydedilemedi: " + e.Message, e); Ui.Hata(this, "Kaydedilemedi: " + e.Message); }
         }
 
         public void Yukle(KayitliTeklif t)
@@ -408,8 +408,8 @@ namespace EcoBuildss.UI
                 Gerekce = TeklifRaporu.Gerekce(secili.S, r.Siralama, r, r.Siralama[0], paketler[0].S, paketler[2].S, SeciliOncelik), Ts825 = secili.S.Ts825Uygun ? "Uygun" : "Uygun değil",
             };
             var tumListe = r.Tum.Select(s => (s, r.Siralama.Any(x => x.Kod == s.Kod) ? (double?)(100 * s.Skor) : null)).ToList();
-            try { XlsxYazici.Yaz(f.FileName, TeklifRaporu.Excel(d.V, secili.S, r, paketler[0].S, bilgi, tumListe)); d.Bildir("Excel dosyası yazıldı: " + f.FileName); }
-            catch (Exception e) { Ui.Hata(sahip, "Excel dosyası yazılamadı: " + e.Message); }
+            try { XlsxYazici.Yaz(f.FileName, TeklifRaporu.Excel(d.V, secili.S, r, paketler[0].S, bilgi, tumListe)); d.Bildir("Excel dosyası yazıldı: " + f.FileName); d.Db?.Gunluk("Teklif Excel'e aktarıldı", $"{secili.Ad} · {SeciliIl.Ad} · {Path.GetFileName(f.FileName)}"); }
+            catch (Exception e) { d.Hata("Excel dosyası yazılamadı: " + e.Message, e); Ui.Hata(sahip, "Excel dosyası yazılamadı: " + e.Message); }
         }
 
         void Yazdir(DataGridView kesif, string gerekce, IWin32Window sahip)
@@ -422,6 +422,7 @@ namespace EcoBuildss.UI
             foreach (DataGridViewRow r in kesif.Rows) satirlar.Add(($"{r.Cells[0].Value} {r.Cells[1].Value}".Trim(), $"{r.Cells[3].Value}", r.DefaultCellStyle.Font == Ui.Kalin));
             satirlar.Add(("", "", false)); satirlar.Add(("Gerekçe", gerekce.Split('\n')[0], false));
             var belge = new PrintDocument { DocumentName = "EcoBuildss teklif" };
+            belge.EndPrint += (_, e) => { if (e.PrintAction == PrintAction.PrintToPrinter) d.Db?.Gunluk("Teklif yazdırıldı", $"{SeciliIl.Ad} · {secili?.Ad}"); };
             belge.PrintPage += (_, e) =>
             {
                 float y = e.MarginBounds.Top, x = e.MarginBounds.Left, w = e.MarginBounds.Width;
