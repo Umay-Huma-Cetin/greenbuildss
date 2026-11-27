@@ -161,6 +161,11 @@ static class Testler
             Yakin(Apartman.Taksit(1200, 12, 0), 100, 1e-12, "Vade farksız taksit");
             Yakin(Apartman.Taksit(1000, 12, 0.01), 88.8487886783417, 1e-6, "Anüite formülü (1.000 TL, 12 ay, %1)");
             Dogrula(a.GeriOdemeYil > 0, "Daire başına geri ödeme hesaplanır");
+            var ad = Apartman.Hesapla(v, r, s, 24, 0.18, 0, 30000, 900, 12, 0.03, 10000);
+            Dogrula(Math.Abs(ad.NetDaireTL - (a.DaireBasiTL - 10000)) < 1e-6 && Math.Abs(ad.AylikTaksit - Apartman.Taksit(ad.NetDaireTL, 12, 0.03)) < 1e-9 && ad.GeriOdemeYil < a.GeriOdemeYil,
+                    "Destek: net tutar ve taksit destek düşülerek, geri ödeme kısalır");
+            var asiri = Apartman.Hesapla(v, r, s, 24, 0.18, 0, 30000, 900, 12, 0.03, 1e9);
+            Dogrula(asiri.NetDaireTL == 0 && asiri.GeriOdemeYil == 0, "Destek daire başı tutarı aşamaz");
         }
 
         Bolum("İçe aktarma ve veri denetimi");

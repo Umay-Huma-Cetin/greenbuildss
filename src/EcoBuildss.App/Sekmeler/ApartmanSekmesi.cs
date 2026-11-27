@@ -15,7 +15,7 @@ namespace EcoBuildss.UI
         readonly ComboBox il = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 240 }, taksit = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 110 },
             dograma = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 240 }, yapim = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 240 };
         readonly NumericUpDown daire = Sayi(1, 500, 16, 0), kat = Sayi(1, 40, 5, 0), en = Sayi(4, 200, 14, 1), boy = Sayi(4, 300, 20, 1),
-            fatura = Sayi(0, 1_000_000, 0, 0, 500), yaz = Sayi(0, 100_000, 0, 0, 50), vade = Sayi(0, 10, 0, 2, 0.25m),
+            fatura = Sayi(0, 1_000_000, 0, 0, 500), yaz = Sayi(0, 100_000, 0, 0, 50), vade = Sayi(0, 10, 0, 2, 0.25m), destek = Sayi(0, 1_000_000, 0, 0, 1000),
             katH = Sayi(2.4m, 6, 2.9m, 2), camOrani = Sayi(0, 90, 18, 0), mevcutU = Sayi(0.3m, 3.5m, 1.78m, 2), kar = Sayi(0, 100, 18, 0), indirim = Sayi(0, 60, 0, 1);
         readonly CheckBox cati = new() { Text = "Çatı arası", Checked = true, AutoSize = true },
             pencere = new() { Text = "Pencereler", AutoSize = true }, zemin = new() { Text = "Bodrum tavanı", AutoSize = true };
@@ -42,7 +42,7 @@ namespace EcoBuildss.UI
             BackColor = Ui.Zemin;
             foreach (var i in d.V.Iller.Where(i => i.Ts825Bolge.HasValue).OrderBy(i => i.Ad, StringComparer.Create(Ui.TR, false))) il.Items.Add(i);
             il.SelectedItem = d.V.VarsayilanIl;
-            taksit.Items.AddRange(new object[] { "Peşin", "6 ay", "10 ay", "12 ay", "18 ay", "24 ay" }); taksit.SelectedIndex = 3;
+            taksit.Items.AddRange(new object[] { "Peşin", "6 ay", "10 ay", "12 ay", "18 ay", "24 ay", "36 ay", "48 ay", "60 ay" }); taksit.SelectedIndex = 3;
             foreach (var x in d.V.Dogramalar) dograma.Items.Add(x);
             dograma.SelectedItem = Girdi.VarsayilanDograma; if (dograma.SelectedIndex < 0 && dograma.Items.Count > 0) dograma.SelectedIndex = 0;
 
@@ -64,6 +64,7 @@ namespace EcoBuildss.UI
             sol.Controls.Add(cati); sol.Controls.Add(zemin); sol.Controls.Add(pencere);
             Baslik("Ödeme");
             sol.Controls.Add(Izgara(("Taksit", taksit), ("Vade farkı (%/ay)", vade)));
+            sol.Controls.Add(Izgara(("Destek (TL/daire)", destek), ("", null)));
             var ac = new LinkLabel { Text = "Ayarlar ▾", AutoSize = true, Font = Ui.Kalin, LinkColor = Ui.Yesil, Margin = new Padding(0, 16, 0, 4) };
             ac.LinkClicked += (_, __) => { digerPanel.Visible = !digerPanel.Visible; ac.Text = digerPanel.Visible ? "Ayarlar ▴" : "Ayarlar ▾"; };
             sol.Controls.Add(ac);
@@ -107,7 +108,7 @@ namespace EcoBuildss.UI
             duzen.Controls.Add(sol, 0, 0); duzen.Controls.Add(orta, 1, 0);
             Controls.Add(duzen);
 
-            foreach (Control c in new Control[] { yapim, cevre, taban, penEn, penBoy, il, taksit, dograma, daire, kat, en, boy, fatura, yaz, vade, katH, camOrani, mevcutU, kar, indirim, cati, pencere, zemin })
+            foreach (Control c in new Control[] { yapim, cevre, taban, penEn, penBoy, destek, il, taksit, dograma, daire, kat, en, boy, fatura, yaz, vade, katH, camOrani, mevcutU, kar, indirim, cati, pencere, zemin })
                 switch (c)
                 {
                     case ComboBox cb: cb.SelectedIndexChanged += (_, __) => Degisti(); break;
@@ -136,7 +137,7 @@ namespace EcoBuildss.UI
 
         void Degisti() { if (!yukleniyor) Hesapla(); }
         Il SeciliIl => (Il)il.SelectedItem!;
-        int TaksitSayisi => taksit.SelectedIndex switch { 1 => 6, 2 => 10, 3 => 12, 4 => 18, 5 => 24, _ => 0 };
+        int TaksitSayisi => taksit.SelectedIndex switch { 1 => 6, 2 => 10, 3 => 12, 4 => 18, 5 => 24, 6 => 36, 7 => 48, 8 => 60, _ => 0 };
 
         /// <summary>Plan çevresi ve taban alanı girildiyse dikdörtgen olmayan plan, yoksa en × boy.</summary>
         Bina BinaKur() => cevre.Value > 0 && taban.Value > 0
@@ -160,7 +161,7 @@ namespace EcoBuildss.UI
                 if (r.Siralama.Count == 0) { g.SadeceTs825 = false; r = KararMotoru.Hesapla(d.V, g); }
                 SonGirdi = g; SonSonuc = r;
                 double? f = fatura.Value > 0 ? (double)fatura.Value : null, y = yaz.Value > 0 ? (double)yaz.Value : null;
-                ApartmanSonucu A(Secenek s) => Apartman.Hesapla(d.V, r, s, (int)daire.Value, (double)kar.Value / 100, (double)indirim.Value / 100, f, y, TaksitSayisi, (double)vade.Value / 100);
+                ApartmanSonucu A(Secenek s) => Apartman.Hesapla(d.V, r, s, (int)daire.Value, (double)kar.Value / 100, (double)indirim.Value / 100, f, y, TaksitSayisi, (double)vade.Value / 100, (double)destek.Value);
                 var eko = r.Siralama.OrderBy(s => s.IlkYatirim).First();
                 var yuk = r.Siralama.OrderBy(s => s.YillikIsitmaKWh).ThenBy(s => s.IlkYatirim).First();
                 paketler = new() { ("Ekonomik", eko, A(eko)), ("Önerilen", r.Siralama[0], A(r.Siralama[0])), ("En yüksek tasarruf", yuk, A(yuk)) };
@@ -174,8 +175,8 @@ namespace EcoBuildss.UI
             if (paketler.Count == 0 || SonSonuc == null) return;
             for (int i = 0; i < 3; i++) { kartlar[i].Veri = paketler[i]; kartlar[i].Secili = i == seciliIndeks; kartlar[i].Invalidate(); }
             var (pad, s, a) = paketler[seciliIndeks]; var r = SonSonuc;
-            buyuk[0].Text = Ui.Tl(a.DaireBasiTL);
-            kucuk[0].Text = $"KDV dahil · {a.DaireSayisi} daire eşit pay · tüm iş {Ui.Tl(a.KdvDahilTL)}";
+            buyuk[0].Text = Ui.Tl(a.NetDaireTL);
+            kucuk[0].Text = a.Destek > 0 ? $"{Ui.Tl(a.DaireBasiTL)} − destek {Ui.Tl(a.Destek)}" : $"KDV dahil · {a.DaireSayisi} daire eşit pay · tüm iş {Ui.Tl(a.KdvDahilTL)}";
             buyuk[1].Text = a.Taksit > 1 ? $"{a.Taksit} × {Ui.Tl(a.AylikTaksit)}" : "Peşin";
             kucuk[1].Text = a.Taksit > 1 ? (vade.Value > 0 ? $"aylık %{vade.Value:0.##} vade farkıyla, toplam {Ui.Tl(a.ToplamOdeme)}" : "vade farksız") : "taksit seçilmedi";
             buyuk[2].Text = $"−%{100 * a.AzalmaOrani:0}";
@@ -203,7 +204,7 @@ namespace EcoBuildss.UI
                 YalitimId = s.Yalitim.Id, CamId = s.Cam.Id, DuvarId = s.Duvar.Id, Dograma = SonGirdi.Dograma, Yakit = "DG",
                 En = (double)en.Value, Boy = (double)boy.Value, Cevre = b.En.HasValue ? 0 : (double)cevre.Value, Taban = b.En.HasValue ? 0 : (double)taban.Value, PencereEn = (double)penEn.Value / 100, PencereBoy = (double)penBoy.Value / 100, KatSayisi = b.KatSayisi, KatYuksekligi = (double)katH.Value, CamOrani = SonGirdi.CamOrani,
                 TeklifTL = a.TeklifTL, TeklifTLm2 = a.TeklifTL / SonSonuc.KullanimAlani, GeriOdemeYil = a.GeriOdemeYil, IndirimOrani = (double)indirim.Value / 100,
-                DaireSayisi = a.DaireSayisi, YapimDonemi = (string)yapim.SelectedItem!,
+                DaireSayisi = a.DaireSayisi, YapimDonemi = (string)yapim.SelectedItem!, DestekDaire = (double)destek.Value,
             };
             if (d.Kabul?.Guvenilir == true)
                 t.KabulOlasiligi = d.Kabul.Olasilik(new Core.Uygulamalar.TeklifOzellik { Il = t.Il, MusteriTipi = t.MusteriTipi, ProjeTuru = t.ProjeTuru, Paket = t.Paket, Oncelik = t.Oncelik,
@@ -224,6 +225,7 @@ namespace EcoBuildss.UI
                 if (t.En > 0) { en.Value = Sinirla(en, t.En); boy.Value = Sinirla(boy, t.Boy); kat.Value = Sinirla(kat, t.KatSayisi); katH.Value = Sinirla(katH, t.KatYuksekligi); }
                 if (t.DaireSayisi > 0) daire.Value = Sinirla(daire, t.DaireSayisi);
                 yapim.SelectedIndex = Math.Max(0, Array.IndexOf(Deprem.Donemler, t.YapimDonemi));
+                destek.Value = Sinirla(destek, t.DestekDaire);
                 camOrani.Value = Sinirla(camOrani, 100 * t.CamOrani); indirim.Value = Sinirla(indirim, 100 * t.IndirimOrani);
             }
             finally { yukleniyor = false; }
@@ -265,7 +267,7 @@ namespace EcoBuildss.UI
                 Yaz($"Önerilen iş: {TeklifRaporu.PaketAdi(s)}" + (r.CatiYalitimi ? " + çatı arası yalıtımı" : "") + (r.ZeminYalitimi ? " + bodrum tavanı yalıtımı" : "") + (r.PencereDegisir ? " + pencere camları" : ""), fAra, Brushes.Black, 12);
                 string[,] kutu =
                 {
-                    { "Daire başına", Ui.Tl(a.DaireBasiTL), "KDV dahil, eşit pay" },
+                    { "Daire başına", Ui.Tl(a.NetDaireTL), a.Destek > 0 ? $"KDV dahil {Ui.Tl(a.DaireBasiTL)} − destek {Ui.Tl(a.Destek)}" : "KDV dahil, eşit pay" },
                     { "Taksitle", a.Taksit > 1 ? $"{a.Taksit} × {Ui.Tl(a.AylikTaksit)}" : "Peşin", a.Taksit > 1 ? $"toplam {Ui.Tl(a.ToplamOdeme)}" : "" },
                     { "Isıtma faturası", $"−%{100 * a.AzalmaOrani:0}", $"yılda {Ui.Tl(a.FaturaOnce)} → {Ui.Tl(a.FaturaSonra)}" },
                     { "Kendini öder", a.GeriOdemeYil is double gy ? $"{Ui.Sayi(gy, "0.0")} yıl" : "40+ yıl", "bugünkü değerle" },
@@ -311,7 +313,7 @@ namespace EcoBuildss.UI
             void Yaz(string t, Font f, Color c, float ek = 3) { var b = g.MeasureString(t, f, (int)w); using var br = new SolidBrush(c); g.DrawString(t, f, br, new RectangleF(x, y, w, b.Height)); y += b.Height + ek; }
             Yaz(ad.ToUpper(Ui.TR) + (ad == "Önerilen" ? "  ★" : ""), Ui.Kalin, ad == "Önerilen" ? Ui.Yesil : Ui.Soluk, 1);
             Yaz(TeklifRaporu.PaketAdi(s), Ui.Kucuk, Ui.Metin, 4);
-            Yaz($"{Ui.Tl(a.DaireBasiTL)} / daire", Ui.BuyukSayi, Ui.Koyu, 2);
+            Yaz($"{Ui.Tl(a.NetDaireTL)} / daire", Ui.BuyukSayi, Ui.Koyu, 2);
             Yaz($"Isıtma faturası −%{100 * a.AzalmaOrani:0} · yılda {Ui.Tl(a.YillikTasarruf)} az", Ui.Kucuk, Ui.Soluk, 0);
         }
     }
