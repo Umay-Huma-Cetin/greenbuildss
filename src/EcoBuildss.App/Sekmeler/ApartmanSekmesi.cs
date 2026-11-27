@@ -13,7 +13,7 @@ namespace EcoBuildss.UI
         readonly Durum d;
         readonly TextBox ad = new() { Width = 240 };
         readonly ComboBox il = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 240 }, taksit = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 110 },
-            dograma = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 240 };
+            dograma = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 240 }, yapim = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 240 };
         readonly NumericUpDown daire = Sayi(1, 500, 16, 0), kat = Sayi(1, 40, 5, 0), en = Sayi(4, 200, 14, 1), boy = Sayi(4, 300, 20, 1),
             fatura = Sayi(0, 1_000_000, 0, 0, 500), yaz = Sayi(0, 100_000, 0, 0, 50), vade = Sayi(0, 10, 0, 2, 0.25m),
             katH = Sayi(2.4m, 6, 2.9m, 2), camOrani = Sayi(0, 90, 18, 0), mevcutU = Sayi(0.3m, 3.5m, 1.78m, 2), kar = Sayi(0, 100, 18, 0), indirim = Sayi(0, 60, 0, 1);
@@ -55,6 +55,8 @@ namespace EcoBuildss.UI
             Alan(sol, "İl", il); sol.Controls.Add(ilBilgi);
             sol.Controls.Add(Izgara(("Daire", daire), ("Kat", kat), ("", null)));
             sol.Controls.Add(Izgara(("En (m)", en), ("Boy (m)", boy), ("", null)));
+            yapim.Items.AddRange(Deprem.Donemler); yapim.SelectedIndex = 0;
+            Alan(sol, "Yapım yılı", yapim);
             Baslik("Doğal gaz faturası (bir daire)");
             sol.Controls.Add(Izgara(("Yıllık (TL)", fatura), ("Yaz, aylık (TL)", yaz)));
             Baslik("İşin kapsamı");
@@ -105,7 +107,7 @@ namespace EcoBuildss.UI
             duzen.Controls.Add(sol, 0, 0); duzen.Controls.Add(orta, 1, 0);
             Controls.Add(duzen);
 
-            foreach (Control c in new Control[] { cevre, taban, penEn, penBoy, il, taksit, dograma, daire, kat, en, boy, fatura, yaz, vade, katH, camOrani, mevcutU, kar, indirim, cati, pencere, zemin })
+            foreach (Control c in new Control[] { yapim, cevre, taban, penEn, penBoy, il, taksit, dograma, daire, kat, en, boy, fatura, yaz, vade, katH, camOrani, mevcutU, kar, indirim, cati, pencere, zemin })
                 switch (c)
                 {
                     case ComboBox cb: cb.SelectedIndexChanged += (_, __) => Degisti(); break;
@@ -180,7 +182,9 @@ namespace EcoBuildss.UI
             kucuk[2].Text = $"{Ui.Tl(a.FaturaOnce)} → {Ui.Tl(a.FaturaSonra)} / yıl" + (a.FaturadanHesaplandi ? "" : " · tahmini");
             buyuk[3].Text = a.GeriOdemeYil is double gy ? $"{Ui.Sayi(gy, "0.0")} yıl" : "40+ yıl";
             kucuk[3].Text = s.Ts825Uygun ? "TS 825'e uygun ✓" : "TS 825'e uygun değil";
-            not.Text = "KMK md. 42: sayı ve arsa payı çoğunluğuyla karar; gider arsa payına göre." + (s.YanginNotu.Length > 0 ? " " + s.YanginNotu : "");
+            string deprem = Deprem.Uyari((string)yapim.SelectedItem!);
+            not.Text = (deprem.Length > 0 ? deprem + " " : "") + "KMK md. 42: sayı ve arsa payı çoğunluğuyla karar; gider arsa payına göre." + (s.YanginNotu.Length > 0 ? " " + s.YanginNotu : "");
+            not.ForeColor = deprem.Length > 0 ? Ui.Kirmizi : Ui.Soluk;
             bina.Form = SonGirdi!.Bina; bina.CamOrani = SonGirdi.CamOrani; bina.KatYuksekligi = (double)katH.Value;
             bina.Yalitim = s.Yalitim; bina.Cam = s.Cam; bina.Duvar = s.Duvar; bina.DuvarU = s.DuvarU; bina.SinirU = r.SinirDuvar;
             bina.HBaz = r.HBaz; bina.HYeni = s.H; bina.CatiU = r.CatiU;
@@ -199,7 +203,7 @@ namespace EcoBuildss.UI
                 YalitimId = s.Yalitim.Id, CamId = s.Cam.Id, DuvarId = s.Duvar.Id, Dograma = SonGirdi.Dograma, Yakit = "DG",
                 En = (double)en.Value, Boy = (double)boy.Value, Cevre = b.En.HasValue ? 0 : (double)cevre.Value, Taban = b.En.HasValue ? 0 : (double)taban.Value, PencereEn = (double)penEn.Value / 100, PencereBoy = (double)penBoy.Value / 100, KatSayisi = b.KatSayisi, KatYuksekligi = (double)katH.Value, CamOrani = SonGirdi.CamOrani,
                 TeklifTL = a.TeklifTL, TeklifTLm2 = a.TeklifTL / SonSonuc.KullanimAlani, GeriOdemeYil = a.GeriOdemeYil, IndirimOrani = (double)indirim.Value / 100,
-                DaireSayisi = a.DaireSayisi,
+                DaireSayisi = a.DaireSayisi, YapimDonemi = (string)yapim.SelectedItem!,
             };
             if (d.Kabul?.Guvenilir == true)
                 t.KabulOlasiligi = d.Kabul.Olasilik(new Core.Uygulamalar.TeklifOzellik { Il = t.Il, MusteriTipi = t.MusteriTipi, ProjeTuru = t.ProjeTuru, Paket = t.Paket, Oncelik = t.Oncelik,
@@ -219,6 +223,7 @@ namespace EcoBuildss.UI
                 if (t.PencereEn > 0) { penEn.Value = Sinirla(penEn, t.PencereEn * 100); penBoy.Value = Sinirla(penBoy, t.PencereBoy * 100); }
                 if (t.En > 0) { en.Value = Sinirla(en, t.En); boy.Value = Sinirla(boy, t.Boy); kat.Value = Sinirla(kat, t.KatSayisi); katH.Value = Sinirla(katH, t.KatYuksekligi); }
                 if (t.DaireSayisi > 0) daire.Value = Sinirla(daire, t.DaireSayisi);
+                yapim.SelectedIndex = Math.Max(0, Array.IndexOf(Deprem.Donemler, t.YapimDonemi));
                 camOrani.Value = Sinirla(camOrani, 100 * t.CamOrani); indirim.Value = Sinirla(indirim, 100 * t.IndirimOrani);
             }
             finally { yukleniyor = false; }
@@ -279,6 +284,7 @@ namespace EcoBuildss.UI
                 Yaz(a.FaturadanHesaplandi ? $"• Tasarruf, bir dairenin gerçek doğal gaz faturasından hesaplandı (yaz aylarındaki sıcak su ve ocak payı ayrıldı)." : "• Fatura bilgisi girilmedi; tasarruf BOTAŞ tarifesi ve KDV ile tahmin edildi.", fYazi, Brushes.Black, 2);
                 Yaz($"• Mantolama alanı {Ui.Sayi(r.OpakDuvar, "N0")} m² (pencereler düşülmüş). Fiyatlar KDV hariç {Ui.Tl(a.TeklifTL)}; KDV %{100 * d.V.P("KDV"):0}.", fYazi, Brushes.Black, 2);
                 if (s.YanginNotu.Length > 0) Yaz("• " + s.YanginNotu, fYazi, Brushes.Black, 2);
+                if (Deprem.Uyari((string)yapim.SelectedItem!) is { Length: > 0 } dep) Yaz("• " + dep, fYazi, Brushes.DarkRed, 2);
                 y += 8;
                 Yaz("Karar", fAra, Brushes.Black, 4);
                 Yaz("Kat Mülkiyeti Kanunu md. 42: ısı yalıtımı kararı kat maliklerinin sayı ve arsa payı çoğunluğuyla alınır; giderler arsa payı oranında ödenir. Daire başına tutar eşit pay varsayımıyla gösterilmiştir.", fYazi, Brushes.Black, 30);

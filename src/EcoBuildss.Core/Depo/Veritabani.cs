@@ -19,7 +19,8 @@ namespace EcoBuildss.Core.Depo
         public string YalitimId = "", CamId = "", DuvarId = "", Dograma = "", Yakit = "DG";
         public double En, Boy, KatYuksekligi, CamOrani; public int KatSayisi; public bool Sogutma;
         public double Cevre, Taban;
-        public double PencereEn, PencereBoy;   // m; 0 = varsayılan   // dikdörtgen olmayan planda dış çevre (m) ve taban alanı (m²); dikdörtgende 0
+        public double PencereEn, PencereBoy;   // m; 0 = varsayılan
+        public string YapimDonemi = "";        // apartman: binanın yapım dönemi (deprem uyarısı için)   // dikdörtgen olmayan planda dış çevre (m) ve taban alanı (m²); dikdörtgende 0
         public int DaireSayisi;   // apartman mantolamasında daire başına paylaşım için
         public string Hazirlayan = "";   // teklifi kaydeden kullanıcı
         public string Sonuc = "Bekliyor";   // Bekliyor / Kabul / Red
@@ -140,7 +141,7 @@ CREATE TABLE IF NOT EXISTS ayarlar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NUL
                 ["kh"] = Ic(t.KatYuksekligi), ["co"] = Ic(t.CamOrani), ["sog"] = t.Sogutma ? "1" : "0", ["tl"] = Ic(t.TeklifTL), ["tlm2"] = Ic(t.TeklifTLm2),
                 ["go"] = t.GeriOdemeYil.HasValue ? Ic(t.GeriOdemeYil.Value) : "", ["ind"] = Ic(t.IndirimOrani), ["yan"] = Ic(t.YanitSuresiGun), ["rak"] = t.RakipTeklif ? "1" : "0",
                 ["ko"] = t.KabulOlasiligi.HasValue ? Ic(t.KabulOlasiligi.Value) : "", ["ds"] = t.DaireSayisi.ToString(CultureInfo.InvariantCulture), ["haz"] = t.Hazirlayan,
-                ["cev"] = Ic(t.Cevre), ["tab"] = Ic(t.Taban), ["pen"] = Ic(t.PencereEn), ["pbo"] = Ic(t.PencereBoy),
+                ["cev"] = Ic(t.Cevre), ["tab"] = Ic(t.Taban), ["pen"] = Ic(t.PencereEn), ["pbo"] = Ic(t.PencereBoy), ["yd"] = t.YapimDonemi,
             };
             return "v2" + Ayrac + string.Join(Ayrac.ToString(), d.Select(kv => kv.Key + Esit + Temiz(kv.Value ?? "")));
         }
@@ -155,7 +156,7 @@ CREATE TABLE IF NOT EXISTS ayarlar (anahtar TEXT PRIMARY KEY, deger TEXT NOT NUL
             t.KatYuksekligi = N("kh"); t.CamOrani = N("co"); t.Sogutma = G("sog") == "1"; t.TeklifTL = N("tl"); t.TeklifTLm2 = N("tlm2");
             t.GeriOdemeYil = G("go").Length == 0 ? null : N("go"); t.IndirimOrani = N("ind"); t.YanitSuresiGun = N("yan"); t.RakipTeklif = G("rak") == "1";
             t.KabulOlasiligi = G("ko").Length == 0 ? null : N("ko"); t.DaireSayisi = (int)N("ds"); t.Hazirlayan = G("haz");
-            t.Cevre = N("cev"); t.Taban = N("tab"); t.PencereEn = N("pen"); t.PencereBoy = N("pbo");
+            t.Cevre = N("cev"); t.Taban = N("tab"); t.PencereEn = N("pen"); t.PencereBoy = N("pbo"); t.YapimDonemi = G("yd");
         }
 
         public void SonucIsaretle(long id, string sonuc)

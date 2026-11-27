@@ -44,6 +44,8 @@ static class Testler
             Directory.Delete(gecici, true);
             var uygunsuz = v.Iller.Where(il => KararMotoru.Hesapla(v, new Girdi { Bina = Bina.Dikdortgen(12, 18, 4, 2.9), Il = il, Bolge = il.Ts825Bolge ?? 4, SadeceTs825 = true }).Siralama.Count == 0).Select(il => il.Ad).ToList();
             Dogrula(uygunsuz.Count == 0, "81 ilin hepsinde TS 825'e uyan en az bir paket var", string.Join(", ", uygunsuz));
+            Dogrula(Deprem.UyariVar("2001 öncesi") && !Deprem.UyariVar("Bilinmiyor") && !Deprem.UyariVar("2001–2018") && Deprem.Donemler.All(x => x.Length > 0),
+                    "Deprem uyarısı yalnız yapı denetimi öncesi binada");
             {
                 var bugun = new DateTime(2026, 11, 28);
                 var tl = new List<KayitliTeklif>
