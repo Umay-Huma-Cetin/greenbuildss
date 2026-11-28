@@ -29,6 +29,7 @@ namespace EcoBuildss.Core.Depo
                 string k = File.ReadAllText(konum).Trim();
                 if (k.Length > 0)
                 {
+                    if (!Path.IsPathRooted(k) || k.IndexOfAny(Path.GetInvalidPathChars()) >= 0) throw new IOException($"Veri konumu dosyası geçersiz: {konum}");
                     try { Directory.CreateDirectory(k); }
                     catch (Exception e) { throw new IOException($"Seçilen veri klasörüne ulaşılamıyor: {k}\n({e.Message})\nAğ bağlantısını kontrol edin.", e); }
                     if (!File.Exists(Path.Combine(k, DbAdi)) && !Yazilabilir(k)) throw new IOException($"Seçilen veri klasörüne yazılamıyor: {k}");

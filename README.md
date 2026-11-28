@@ -44,7 +44,10 @@ Geliştiren: **Umay Hüma Çetin**
 
 **Parolalar ve oturum**
 - Parolalar PBKDF2-HMAC-SHA256 ile saklanır: 600.000 tekrar, kullanıcıya özel tuz. Parolanın kendisi hiçbir yerde tutulmaz.
-- Parola kuralı: en az 8 karakter, harf ve rakam içermeli, kullanıcı adını içermemeli.
+- Parola kuralı: 8–128 karakter, harf ve rakam içermeli, kullanıcı adını içermemeli; yaygın parolalar (parola123, qwerty2024…) ve tekrarlı diziler (11112222) reddedilir. Yeni parola eskisiyle aynı olamaz.
+- Kullanıcı adı yalnız İngilizce harf, rakam, nokta ve alt çizgiden oluşur; büyük/küçük harf farkı aynı kişi sayılır (iki hesabın anahtarı birbirini ezemez).
+- Parola değişikliği ile veri anahtarının yeniden sarılması tek işlemde yapılır; yarım kalıp kullanıcıyı verisinden koparmaz.
+- Kilitlenince açık pencereler kapanır; başka biri girerse önceki kullanıcının ekrandaki müşteri bilgisi temizlenir. Panoya kopyalanan kurtarma anahtarı 60 sn sonra silinir.
 - Yöneticinin verdiği geçici parola ilk girişte değiştirilmek zorundadır.
 - 5 hatalı denemede hesap 15 dakika kilitlenir. Kullanıcı adının var olup olmadığı giriş ekranında belli edilmez.
 - 15 dakika işlem yapılmazsa oturum kilitlenir.
@@ -76,8 +79,10 @@ Geliştiren: **Umay Hüma Çetin**
 
 **Yedek** sekmesinden istediği an yedek alabilir ve yedekten geri yükleyebilir. Geri yüklemeden önce mevcut durum ayrıca yedeklenir; geri yüklemeden sonra yeniden giriş istenir.
 - Yedekler SQLite'ın çevrimiçi yedekleme arayüzüyle alınır, yani tutarlıdır.
+- Geri yüklenecek yedeğin günlük zinciri sağlam ve mühürü **bu firmanın veri anahtarıyla** atılmış olmalıdır. Ortak klasöre bırakılmış sahte ya da başka kurulumdan gelen bir veritabanı geri yüklenemez.
+- Silinen içerik diskte sıfırlanır (`secure_delete`); şifrelemeye geçişten sonra dosya yeniden yazılır, eski düz metin sayfası kalmaz.
 
-**Sınır:** Teklif numarası, tarih ve sonuç (Bekliyor/Kabul/Red) düz tutulur; numaralama ve sıralama bunlarla yapılır. Kullanıcı adları, roller ve güncellenen fiyatlar da düzdür. Yedekler şifreli alanlarıyla alınır.
+**Sınır:** Ortak veri klasörüne (`C:\ProgramData\EcoBuildss` ya da ağ klasörü) o bilgisayarın Windows kullanıcıları dosya olarak erişebilir; dosyayı silebilir ya da değiştirebilirler. Şifreli bilgiyi okuyamazlar, değişiklik günlük zinciri ve mühürle fark edilir, yedekten geri dönülür. Teklif numarası, tarih ve sonuç (Bekliyor/Kabul/Red) düz tutulur; numaralama ve sıralama bunlarla yapılır. Kullanıcı adları, roller ve güncellenen fiyatlar da düzdür. Yedekler şifreli alanlarıyla alınır.
 
 | | |
 |---|---|
@@ -148,7 +153,7 @@ dotnet run --project tests/EcoBuildss.Tests
 python araclar/dogrulama/bagimsiz_dogrulama.py <klasör>   # isteğe bağlı: pandas, scikit-learn
 ```
 
-126 test vardır ve şunları kapsar:
+129 test vardır ve şunları kapsar:
 - metrikler (F1, AUC, CV(RMSE))
 - regresyon ve gerçek levha fiyatları
 - enerji motoru ve yangın yönetmeliği kuralı
@@ -159,7 +164,8 @@ python araclar/dogrulama/bagimsiz_dogrulama.py <klasör>   # isteğe bağlı: pa
 - az veride ve sinyalsiz veride kalite eşiğinin modeli reddetmesi
 - apartman hesabı (kapsam, faturadan tasarruf, taksit)
 - SQLite kaydı (parametreli sorgu)
-- güvenlik: parola özeti, kilitleme, roller, geçici parola, alan şifreleme ve değiştirilmiş şifreli değerin yakalanması, kurtarma anahtarı ve yenilenmesi, Satış rolünün başkasının teklifine erişememesi, günlük mühürü (baştan yazılan ve sondan silinen günlüğün yakalanması), teklif ayrıntılarının diskte şifreli olması, fiyat güncelleme ve geri alma, günlük zinciri ve değişiklik tespiti, yedek ve geri yükleme
+- ortak kullanım: iki bağlantının aynı anda yazması, veri konumunun taşınması ve geri alınması
+- güvenlik: sahte/yabancı yedeğin reddi, kullanıcı adı ve yaygın parola kuralları, parola özeti, kilitleme, roller, geçici parola, alan şifreleme ve değiştirilmiş şifreli değerin yakalanması, kurtarma anahtarı ve yenilenmesi, Satış rolünün başkasının teklifine erişememesi, günlük mühürü (baştan yazılan ve sondan silinen günlüğün yakalanması), teklif ayrıntılarının diskte şifreli olması, fiyat güncelleme ve geri alma, günlük zinciri ve değişiklik tespiti, yedek ve geri yükleme
 
 ## Klasörler
 

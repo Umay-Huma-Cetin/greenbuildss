@@ -63,11 +63,22 @@ namespace EcoBuildss.Core.Depo
         }
 
         /// <summary>Parola kuralı: en az 8 karakter, en az bir harf ve bir rakam. Uygunsa null, değilse neden.</summary>
+        // Sık kullanılan parolaların harf kısmı (rakam eklenerek kullanılırlar: parola123, qwerty2024…)
+        static readonly HashSet<string> Yaygin = new(StringComparer.Ordinal)
+        {
+            "parola", "sifre", "şifre", "password", "passw", "qwerty", "qwe", "asdf", "asd", "abc", "abcd", "admin", "yonetici", "yönetici",
+            "deneme", "test", "kullanici", "kullanıcı", "galatasaray", "fenerbahce", "fenerbahçe", "besiktas", "beşiktaş", "trabzonspor",
+            "iloveyou", "welcome", "letmein", "ecobuildss", "mantolama", "a", "aa", "aaa", "aaaa",
+        };
+
         public static string? Kural(string parola, string kullaniciAdi)
         {
             if (parola.Length < EnAzUzunluk) return $"Parola en az {EnAzUzunluk} karakter olmalı.";
             if (!parola.Any(char.IsLetter) || !parola.Any(char.IsDigit)) return "Parolada en az bir harf ve bir rakam olmalı.";
             if (kullaniciAdi.Length > 0 && parola.IndexOf(kullaniciAdi, StringComparison.OrdinalIgnoreCase) >= 0) return "Parola kullanıcı adını içermemeli.";
+            if (parola.Length > 128) return "Parola en çok 128 karakter olabilir.";
+            string sade = new string(parola.ToLowerInvariant().Where(char.IsLetter).ToArray());
+            if (Yaygin.Contains(sade) || parola.Distinct().Count() < 4) return "Bu parola çok kolay tahmin edilir; başka bir parola seçin.";
             return null;
         }
     }
@@ -176,8 +187,18 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
         /// <summary>Günlük zincirini baştan doğrular. Bozuk kayıt yoksa null, varsa ilk bozuk kaydın sırası ve nedeni.</summary>
         public (int kayit, string? sorun) GunlukDogrula()
         {
+            var (n, zs) = ZincirDogrula(b);
+            if (zs != null) return (n, zs);
+            var ihlal = b.Sorgu("SELECT deger FROM ayarlar WHERE anahtar = 'gunluk_ihlal'");
+            if (ihlal.Count > 0) return (n, S(ihlal[0]["deger"]));
+            if (dek != null && MuhurSorunu(b) is string ms) return (n, ms);
+            return (n, null);
+        }
+
+        static (int kayit, string? sorun) ZincirDogrula(SqliteBaglanti c)
+        {
             string onceki = ""; long beklenenId = 0; int n = 0;
-            foreach (var r in b.Sorgu("SELECT id, tarih, kullanici, seviye, islem, ayrinti, ozet FROM islem_gunlugu ORDER BY id"))
+            foreach (var r in c.Sorgu("SELECT id, tarih, kullanici, seviye, islem, ayrinti, ozet FROM islem_gunlugu ORDER BY id"))
             {
                 n++;
                 long id = (long)r["id"]!;
@@ -186,20 +207,20 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
                 if (ozet != S(r["ozet"])) return (n, $"#{id} numaralı kayıt sonradan değiştirilmiş.");
                 onceki = ozet; beklenenId = id + 1;
             }
-            var ihlal = b.Sorgu("SELECT deger FROM ayarlar WHERE anahtar = 'gunluk_ihlal'");
-            if (ihlal.Count > 0) return (n, S(ihlal[0]["deger"]));
-            if (dek != null && MuhurSorunu() is string ms) return (n, ms);
             return (n, null);
         }
 
         /// <summary>Mühürlü son kaydın yerinde ve değişmemiş olduğunu denetler (veri anahtarı açıkken).</summary>
-        string? MuhurSorunu()
+        string? MuhurSorunu() => MuhurSorunu(b);
+
+
+        string? MuhurSorunu(SqliteBaglanti c, bool zorunlu = false)
         {
-            var m = b.Sorgu("SELECT deger FROM ayarlar WHERE anahtar = @a", new Dictionary<string, object?> { ["a"] = MuhurAnahtari });
-            if (m.Count == 0) return null;   // henüz mühür yok (eski sürüm); girişte oluşturulur
+            var m = c.Sorgu("SELECT deger FROM ayarlar WHERE anahtar = @a", new Dictionary<string, object?> { ["a"] = MuhurAnahtari });
+            if (m.Count == 0) return zorunlu ? "Günlük mühürü yok." : null;   // henüz mühür yok (eski sürüm); girişte oluşturulur
             var p = S(m[0]["deger"]).Split('|');
             if (p.Length != 2 || !long.TryParse(p[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out long mid)) return "Günlük mühürü bozuk.";
-            var satir = b.Sorgu("SELECT ozet FROM islem_gunlugu WHERE id = @id", new Dictionary<string, object?> { ["id"] = mid });
+            var satir = c.Sorgu("SELECT ozet FROM islem_gunlugu WHERE id = @id", new Dictionary<string, object?> { ["id"] = mid });
             if (satir.Count == 0) return $"#{mid} ve sonrasındaki günlük kayıtları silinmiş.";
             if (!SabitZamanEsit(MuhurHesapla(mid, S(satir[0]["ozet"])), p[1])) return "Günlük sonradan baştan yazılmış (mühür tutmuyor).";
             return null;
@@ -264,10 +285,12 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
         Kullanici Ekle(string kullaniciAdi, string adSoyad, Rol rol, string parola)
         {
             kullaniciAdi = kullaniciAdi.Trim(); adSoyad = adSoyad.Trim();
-            if (kullaniciAdi.Length < 3 || !kullaniciAdi.All(c => char.IsLetterOrDigit(c) || c == '.' || c == '_')) throw new ArgumentException("Kullanıcı adı en az 3 karakter olmalı; yalnız harf, rakam, nokta ve alt çizgi kullanılabilir.");
+            kullaniciAdi = kullaniciAdi.ToLowerInvariant();
+            if (kullaniciAdi.Length < 3 || kullaniciAdi.Length > 32 || !kullaniciAdi.All(c => c is >= 'a' and <= 'z' or >= '0' and <= '9' or '.' or '_'))
+                throw new ArgumentException("Kullanıcı adı 3–32 karakter olmalı; yalnız İngilizce harf (ç, ğ, ı, ö, ş, ü olmadan), rakam, nokta ve alt çizgi.");
             if (adSoyad.Length == 0) throw new ArgumentException("Ad soyad boş olamaz.");
             if (Parola.Kural(parola, kullaniciAdi) is string k) throw new ArgumentException(k);
-            if (b.Sorgu("SELECT 1 FROM kullanicilar WHERE kullanici_adi = @k", new Dictionary<string, object?> { ["k"] = kullaniciAdi }).Count > 0) throw new ArgumentException("Bu kullanıcı adı kullanılıyor.");
+            if (b.Sorgu("SELECT 1 FROM kullanicilar WHERE kullanici_adi = @k COLLATE NOCASE", new Dictionary<string, object?> { ["k"] = kullaniciAdi }).Count > 0) throw new ArgumentException("Bu kullanıcı adı kullanılıyor.");
             long id = b.Yaz("INSERT INTO kullanicilar (kullanici_adi, ad_soyad, rol, parola, olusturma) VALUES (@k, @a, @r, @p, @o)", new Dictionary<string, object?>
             { ["k"] = kullaniciAdi, ["a"] = adSoyad, ["r"] = rol == Rol.Yonetici ? "Yönetici" : "Satış", ["p"] = Parola.Ozetle(parola), ["o"] = DateTime.Now });
             return new Kullanici { Id = id, KullaniciAdi = kullaniciAdi, AdSoyad = adSoyad, Rol = rol };
@@ -277,7 +300,7 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
         public GirisSonucu GirisYap(string kullaniciAdi, string parola)
         {
             if (Aktif != null) OturumKapat("yeni giriş");   // önceki oturum ve veri anahtarı, giriş başarısız olsa da kalmaz
-            var r = b.Sorgu("SELECT * FROM kullanicilar WHERE kullanici_adi = @k", new Dictionary<string, object?> { ["k"] = kullaniciAdi.Trim() });
+            var r = b.Sorgu("SELECT * FROM kullanicilar WHERE kullanici_adi = @k COLLATE NOCASE", new Dictionary<string, object?> { ["k"] = kullaniciAdi.Trim() });
             if (r.Count == 0)
             {
                 Parola.Dogrula(parola, Parola.Ozetle("zamanlama-esitleme", 1000));   // var olmayan kullanıcıda da benzer süre
@@ -329,9 +352,14 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
             var u = b.Sorgu("SELECT parola FROM kullanicilar WHERE id = @id", new Dictionary<string, object?> { ["id"] = Aktif!.Id })[0];
             if (!Parola.Dogrula(eski, S(u["parola"]))) { Gunluk("Parola değiştirilemedi", $"{Aktif.KullaniciAdi}: eski parola hatalı", Seviye.Guvenlik); throw new ArgumentException("Mevcut parola hatalı."); }
             if (Parola.Kural(yeni, Aktif.KullaniciAdi) is string k) throw new ArgumentException(k);
-            b.Yaz("UPDATE kullanicilar SET parola = @p, parola_degismeli = 0 WHERE id = @id", new Dictionary<string, object?> { ["p"] = Parola.Ozetle(yeni), ["id"] = Aktif.Id });
+            if (yeni == eski) throw new ArgumentException("Yeni parola eskisiyle aynı olamaz.");
+            // Parola ve veri anahtarının sarılması birlikte yazılır: biri yarım kalırsa kullanıcı verisine erişimini kaybetmesin
+            b.Islem(() =>
+            {
+                b.Yaz("UPDATE kullanicilar SET parola = @p, parola_degismeli = 0 WHERE id = @id", new Dictionary<string, object?> { ["p"] = Parola.Ozetle(yeni), ["id"] = Aktif.Id });
+                AnahtarSar(Aktif.KullaniciAdi, yeni);
+            });
             Aktif.ParolaDegismeli = false;
-            AnahtarSar(Aktif.KullaniciAdi, yeni);
             Gunluk("Parola değiştirildi", Aktif.KullaniciAdi, Seviye.Guvenlik);
         }
 
@@ -340,8 +368,11 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
             Yetki(yonetici: true, "Parola sıfırlama");
             var k = TumKullanicilar().First(x => x.Id == id);
             if (Parola.Kural(yeni, k.KullaniciAdi) is string m) throw new ArgumentException(m);
-            b.Yaz("UPDATE kullanicilar SET parola = @p, hatali_deneme = 0, kilit_bitis = NULL, parola_degismeli = 1 WHERE id = @id", new Dictionary<string, object?> { ["p"] = Parola.Ozetle(yeni), ["id"] = id });
-            AnahtarSar(k.KullaniciAdi, yeni);
+            b.Islem(() =>
+            {
+                b.Yaz("UPDATE kullanicilar SET parola = @p, hatali_deneme = 0, kilit_bitis = NULL, parola_degismeli = 1 WHERE id = @id", new Dictionary<string, object?> { ["p"] = Parola.Ozetle(yeni), ["id"] = id });
+                AnahtarSar(k.KullaniciAdi, yeni);
+            });
             Gunluk("Parola sıfırlandı", k.KullaniciAdi, Seviye.Guvenlik);
         }
 
@@ -435,8 +466,11 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
             var onceki = dek; dek = acik;
             try
             {
-                b.Yaz("UPDATE kullanicilar SET parola = @p, parola_degismeli = 0, hatali_deneme = 0, kilit_bitis = NULL WHERE id = @id", new Dictionary<string, object?> { ["p"] = Parola.Ozetle(yeniParola), ["id"] = k.Id });
-                AnahtarSar(k.KullaniciAdi, yeniParola);
+                b.Islem(() =>
+                {
+                    b.Yaz("UPDATE kullanicilar SET parola = @p, parola_degismeli = 0, hatali_deneme = 0, kilit_bitis = NULL WHERE id = @id", new Dictionary<string, object?> { ["p"] = Parola.Ozetle(yeniParola), ["id"] = k.Id });
+                    AnahtarSar(k.KullaniciAdi, yeniParola);
+                });
                 Gunluk("Kurtarma anahtarıyla parola yenilendi", k.KullaniciAdi, Seviye.Guvenlik);
             }
             finally { Array.Clear(acik, 0, acik.Length); dek = onceki; }
@@ -460,6 +494,14 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
                         b.Yaz("UPDATE veri_kayitlari SET satir = @s WHERE veri_seti = @v AND anahtar = @a", new Dictionary<string, object?> { ["s"] = Sifrele(S(r["satir"])), ["v"] = r["veri_seti"], ["a"] = r["anahtar"] });
             });
             TeklifSifrelemesiniTamamla();
+            EskiSayfalariTemizle();
+        }
+
+        /// <summary>Şifrelemeye geçişten sonra dosyada eski düz metin sayfası kalmasın: WAL boşaltılır, dosya yeniden yazılır.</summary>
+        void EskiSayfalariTemizle()
+        {
+            try { b.Calistir("PRAGMA wal_checkpoint(TRUNCATE)"); b.Calistir("VACUUM"); b.Calistir("PRAGMA wal_checkpoint(TRUNCATE)"); }
+            catch (Exception e) { Gunluk("Temizlik yapılamadı", e.Message, Seviye.Uyari); }
         }
 
         /// <summary>Eski sürümlerde düz ya da kısmen şifreli kalan teklif satırlarını tam şifreli biçime çevirir.</summary>
@@ -470,6 +512,7 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
             if (eski.Count == 0) return;
             b.Islem(() => { foreach (var t in eski) TeklifGizliYaz(t); });
             Gunluk("Teklifler şifrelendi", $"{eski.Count} teklif tam şifreli biçime çevrildi", Seviye.Guvenlik);
+            EskiSayfalariTemizle();
         }
 
         static string GizliBirlestir(string musteri, double tl, double tlm2, double indirim, double? kabul) =>
@@ -525,7 +568,17 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
             Yetki(yonetici: true, "Yedekten geri yükleme");
             var kim = Aktif!;
             using (var kontrol = new SqliteBaglanti(yedekDosyasi, pragmasiz: true))
-                if (kontrol.Sorgu("SELECT name FROM sqlite_master WHERE type='table' AND name='teklifler'").Count == 0) throw new InvalidDataException("Seçilen dosya bir EcoBuildss yedeği değil.");
+            {
+                if (kontrol.Sorgu("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('teklifler','islem_gunlugu','ayarlar')").Count < 3) throw new InvalidDataException("Seçilen dosya bir EcoBuildss yedeği değil.");
+                // Yabancı ya da değiştirilmiş yedek reddedilir: zincir sağlam olmalı ve mühür bu firmanın veri anahtarıyla atılmış olmalı
+                // (aksi hâlde ortak klasöre bırakılmış sahte bir veritabanı, kendi yönetici hesabıyla firmanın yerine geçebilirdi).
+                string? sorun = ZincirDogrula(kontrol).sorun ?? MuhurSorunu(kontrol, zorunlu: true);
+                if (sorun != null)
+                {
+                    Gunluk("Geri yükleme reddedildi", $"{Path.GetFileName(yedekDosyasi)}: {sorun}", Seviye.Guvenlik);
+                    throw new InvalidDataException("Bu yedek bu firmanın veri anahtarıyla oluşturulmamış ya da sonradan değiştirilmiş: " + sorun);
+                }
+            }
             string onceki = YedekAl("geri-yukleme-oncesi");
             Gunluk("Yedekten geri yükleniyor", $"{Path.GetFileName(yedekDosyasi)} · önceki durum: {Path.GetFileName(onceki)}", Seviye.Guvenlik);
             b.Yedekle(yedekDosyasi, geriYukle: true);

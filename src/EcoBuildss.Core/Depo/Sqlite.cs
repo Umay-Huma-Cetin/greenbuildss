@@ -53,9 +53,9 @@ namespace EcoBuildss.Core.Depo
             Dosya = dosya;
             int rc = sqlite3_open_v2(Utf8(dosya), out db, 0x02 | 0x04, IntPtr.Zero);   // READWRITE | CREATE
             if (rc != OK) { string m = Hata(); sqlite3_close_v2(db); db = IntPtr.Zero; throw new InvalidOperationException($"Veritabanı açılamadı ({dosya}): {m}"); }
-            // Birden çok kişi aynı dosyayı kullanabilir: kilit varsa 10 sn beklenir.
+            // Birden çok kişi aynı dosyayı kullanabilir: kilit varsa 10 sn beklenir. Silinen içerik diskte sıfırlanır (secure_delete).
             // Ağ klasöründe WAL çalışmaz (paylaşılan bellek gerektirir); orada klasik günlük kipi kullanılır.
-            if (!pragmasiz) Calistir($"PRAGMA busy_timeout = 10000; PRAGMA foreign_keys = ON; PRAGMA journal_mode = {(AgYolu(dosya) ? "DELETE" : "WAL")};");
+            if (!pragmasiz) Calistir($"PRAGMA busy_timeout = 10000; PRAGMA foreign_keys = ON; PRAGMA secure_delete = ON; PRAGMA journal_mode = {(AgYolu(dosya) ? "DELETE" : "WAL")};");
         }
 
         /// <summary>Dosya ağ paylaşımında mı (\\sunucu\klasör ya da ağ sürücüsü)?</summary>

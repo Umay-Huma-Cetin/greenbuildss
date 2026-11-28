@@ -151,6 +151,9 @@ namespace EcoBuildss.UI
             ? Bina.Plan((double)cevre.Value, (double)taban.Value, (int)kat.Value, (double)katH.Value)
             : Bina.Dikdortgen((double)en.Value, (double)boy.Value, (int)kat.Value, (double)katH.Value);
 
+        /// <summary>Oturum başka kullanıcıya geçince önceki kullanıcının müşteri adı ekranda kalmasın.</summary>
+        public void MusteriyiTemizle() { ad.Text = ""; }
+
         public void Hesapla()
         {
             try

@@ -327,6 +327,11 @@ static class Testler
                 Dogrula(Parola.Ozetle("Deneme123", 1000) != ozet, "Her parola özeti farklı tuzla üretilir");
                 Dogrula(Parola.Kural("kisa1", "x") != null && Parola.Kural("sadeceharf", "x") != null && Parola.Kural("umay2026x", "umay") != null && Parola.Kural("Guvenli99", "umay") == null, "Parola kuralı");
                 var satis = db.KullaniciEkle("mehmet", "Mehmet Yılmaz", Rol.Satis, "Satis2026!");
+                bool ayniAd = false; try { db.KullaniciEkle("MEHMET", "Başka", Rol.Yonetici, "Baska2026!x"); } catch (ArgumentException) { ayniAd = true; }
+                bool turkce = false; try { db.KullaniciEkle("şükrü", "Şükrü", Rol.Satis, "Baska2026!x"); } catch (ArgumentException) { turkce = true; }
+                Dogrula(ayniAd && turkce, "Büyük/küçük harf farklı aynı kullanıcı adı ve Türkçe karakterli ad reddedilir (anahtarlar birbirini ezmez)");
+                Dogrula(Parola.Kural("Parola123", "x") != null && Parola.Kural("qwerty2024", "x") != null && Parola.Kural("11112222", "x") != null && Parola.Kural("Tasyunu7Mart", "x") == null,
+                        "Yaygın ve tekrarlı parolalar reddedilir");
                 db.OturumKapat();
                 Dogrula(db.GirisYap("mehmet", "yanlis-parola1") == GirisSonucu.HataliBilgi, "Hatalı parola reddedilir");
                 Dogrula(db.GirisYap("olmayan", "Herhangi123") == GirisSonucu.HataliBilgi, "Bilinmeyen kullanıcı aynı yanıtı alır");
@@ -385,6 +390,14 @@ static class Testler
                 db.GirisYap("umay", "Gizli2026!");
                 Dogrula(db.Teklifler().Count == 1 && db.Teklifler()[0].Musteri == t.Musteri, "Yedekten geri yükleme (şifreli alanlar çözülür)");
                 Dogrula(db.Yedekler().Count >= 2, "Geri yüklemeden önce mevcut durum yedeklenir");
+                // Başka bir kurulumun (başka veri anahtarı) yedeği geri yüklenemez
+                string yabanci = Path.Combine(Path.GetTempPath(), "ecobuildss_yabanci_" + Guid.NewGuid().ToString("N") + ".db");
+                using (var y = new Veritabani(yabanci)) y.IlkYonetici("saldirgan", "Saldirgan Kişi", "Saldiri2026!x");
+                string yabanciYedek = Path.Combine(Path.GetTempPath(), "ecobuildss_yabanci_yedek_" + Guid.NewGuid().ToString("N") + ".db");
+                using (var y = new SqliteBaglanti(yabanci, pragmasiz: true)) y.Yedekle(yabanciYedek);
+                bool reddedildi = false; try { db.GeriYukle(yabanciYedek); } catch (InvalidDataException) { reddedildi = true; }
+                Dogrula(reddedildi && db.Aktif != null && db.Teklifler().Count == 1, "Başka anahtarla oluşturulmuş (sahte) yedek geri yüklenmez");
+                foreach (var f in new[] { yabanci, yabanciYedek }) foreach (var e in new[] { "", "-wal", "-shm" }) if (File.Exists(f + e)) File.Delete(f + e);
                 Dogrula(db.OtomatikYedek() != null && db.OtomatikYedek() == null, "Otomatik yedek günde bir kez alınır");
 
                 // ---- Şifreleme ----

@@ -41,7 +41,9 @@ namespace EcoBuildss.UI
             {
                 string k = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EcoBuildss");
                 Directory.CreateDirectory(k);
-                File.AppendAllText(Path.Combine(k, "hata.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}\t{mesaj}{(e != null ? "\t" + e : "")}{Environment.NewLine}");
+                string dosya = Path.Combine(k, "hata.log");
+                if (File.Exists(dosya) && new FileInfo(dosya).Length > 5 * 1024 * 1024) { File.Delete(dosya + ".eski"); File.Move(dosya, dosya + ".eski"); }   // en çok ~10 MB yer kaplar
+                File.AppendAllText(dosya, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}\t{mesaj}{(e != null ? "\t" + e : "")}{Environment.NewLine}");
             }
             catch { }
         }

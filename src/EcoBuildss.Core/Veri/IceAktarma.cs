@@ -76,9 +76,12 @@ namespace EcoBuildss.Core.Veri
     /// </summary>
     public static class IceAktarici
     {
+        public const long AzamiDosya = 50L * 1024 * 1024;   // 50 MB: on binlerce satır için fazlasıyla yeter, belleği tüketmez
+
         public static IceAktarmaSonucu Dosyadan(string yol, Sema sema)
         {
             if (!File.Exists(yol)) return new IceAktarmaSonucu { DosyaGecersiz = true, Bulgular = { new Bulgu { Mesaj = "Dosya bulunamadı." } } };
+            if (new FileInfo(yol).Length > AzamiDosya) return new IceAktarmaSonucu { DosyaGecersiz = true, Bulgular = { new Bulgu { Mesaj = $"Dosya çok büyük (en çok {AzamiDosya / 1024 / 1024} MB)." } } };
             return Metinden(File.ReadAllText(yol, Encoding.UTF8), sema);
         }
 

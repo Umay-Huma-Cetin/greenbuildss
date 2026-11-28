@@ -40,7 +40,10 @@ namespace EcoBuildss.UI
             catch (Exception e)
             {
                 Durum.HataDosyasina("Veritabanı açılamadı: " + e.Message, e);
-                MessageBox.Show("Veritabanı açılamadı:\n\n" + e.Message + "\n\nKullanıcı hesapları veritabanında tutulduğu için program bu durumda açılmaz.", "EcoBuildss", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                string ipucu = File.Exists(Path.Combine(AnaForm.OrtakKlasor, VeriKonumu.KonumDosyasi))
+                    ? $"\n\nVeri bir ağ klasöründe. Ağ bağlantısını kontrol edin. O klasör artık kullanılmayacaksa {Path.Combine(AnaForm.OrtakKlasor, VeriKonumu.KonumDosyasi)} dosyasını silin; program bu bilgisayardaki veriyle açılır."
+                    : "";
+                MessageBox.Show("Veritabanı açılamadı:\n\n" + e.Message + ipucu + "\n\nKullanıcı hesapları veritabanında tutulduğu için program bu durumda açılmaz.", "EcoBuildss", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return null;
             }
             d.Db.Gunluk("Program açıldı", $"sürüm {typeof(Program).Assembly.GetName().Version} · {Environment.MachineName} · {Environment.UserName} · {AnaForm.Konum?.Klasor}");

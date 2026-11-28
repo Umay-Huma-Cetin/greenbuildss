@@ -87,7 +87,18 @@ namespace EcoBuildss.UI
             var onay = new CheckBox { Text = "Kaydettim", AutoSize = true };
             var t = Ui.Dugme("Tamam", (_, __) => f.DialogResult = DialogResult.OK, true); t.Enabled = false;
             onay.CheckedChanged += (_, __) => t.Enabled = onay.Checked;
-            p.Controls.Add(Ui.Dugme("Kopyala", (_, __) => { try { Clipboard.SetText(anahtar); } catch { } }));
+            p.Controls.Add(Ui.Dugme("Kopyala", (_, __) =>
+            {
+                try
+                {
+                    Clipboard.SetText(anahtar);
+                    // Anahtar panoda unutulmasın: 60 sn sonra, hâlâ oradaysa silinir
+                    var t = new System.Windows.Forms.Timer { Interval = 60_000 };
+                    t.Tick += (s1, e1) => { t.Stop(); t.Dispose(); try { if (Clipboard.ContainsText() && Clipboard.GetText() == anahtar) Clipboard.Clear(); } catch { } };
+                    t.Start();
+                }
+                catch { }
+            }));
             p.Controls.Add(onay); p.Controls.Add(t);
             f.Controls.Add(p);
             f.FormClosing += (_, e) => { if (!onay.Checked) e.Cancel = true; };   // anahtar kaydedilmeden kapanmaz

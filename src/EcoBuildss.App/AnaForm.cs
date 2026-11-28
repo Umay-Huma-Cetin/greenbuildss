@@ -129,13 +129,18 @@ namespace EcoBuildss.UI
         void Kilitle(string neden, string bilgi)
         {
             bekleme.Stop();
+            string? onceki = d.Kullanici?.KullaniciAdi;
             d.Db?.OturumKapat(neden);
             icerik.Visible = false;
+            // Açık pencereler (kullanıcı ekleme, indirim, ayrıntılar…) kilit ekranının arkasında görünür kalmasın
+            foreach (var f in Application.OpenForms.Cast<Form>().Where(f => f != this).ToList()) { f.Hide(); f.Close(); }
             using (var g = new GirisFormu(d.Db!, bilgi))
             {
                 if (g.ShowDialog(this) != DialogResult.OK) { Close(); return; }
             }
             sonEtkinlik = DateTime.Now;
+            // Başka biri girdiyse önceki kullanıcının ekrandaki müşteri bilgisi ona görünmesin
+            if (d.Kullanici?.KullaniciAdi != onceki) { apartman.MusteriyiTemizle(); teklif.MusteriyiTemizle(); Goster(0); }
             icerik.Visible = true;
             OturumuYansit();
             d.FiyatlariUygula();
