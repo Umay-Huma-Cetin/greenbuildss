@@ -21,13 +21,17 @@ ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 WizardStyle=modern
 UninstallDisplayIcon={app}\EcoBuildss.exe
-; Veritabanı ve yedekler kullanıcının %AppData%\EcoBuildss klasöründedir; kaldırınca silinmez (firma verisi kaybolmasın).
+; Veritabanı ve yedekler C:\ProgramData\EcoBuildss (ya da yöneticinin seçtiği ağ klasörü) içindedir; kaldırınca silinmez (firma verisi kaybolmasın).
 
 [Languages]
 Name: "turkish"; MessagesFile: "compiler:Languages\Turkish.isl"
 
 [Tasks]
 Name: "masaustu"; Description: "Masaüstüne kısayol koy"; GroupDescription: "Kısayollar:"
+
+[Dirs]
+; Veritabanının ortak klasörü: bilgisayardaki bütün Windows kullanıcıları aynı veriyi kullanır
+Name: "{commonappdata}\EcoBuildss"; Permissions: users-modify
 
 [Files]
 Source: "cikti\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

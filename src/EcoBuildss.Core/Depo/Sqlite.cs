@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -52,7 +53,17 @@ namespace EcoBuildss.Core.Depo
             Dosya = dosya;
             int rc = sqlite3_open_v2(Utf8(dosya), out db, 0x02 | 0x04, IntPtr.Zero);   // READWRITE | CREATE
             if (rc != OK) { string m = Hata(); sqlite3_close_v2(db); db = IntPtr.Zero; throw new InvalidOperationException($"Veritabanı açılamadı ({dosya}): {m}"); }
-            if (!pragmasiz) Calistir("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;");
+            // Birden çok kişi aynı dosyayı kullanabilir: kilit varsa 10 sn beklenir.
+            // Ağ klasöründe WAL çalışmaz (paylaşılan bellek gerektirir); orada klasik günlük kipi kullanılır.
+            if (!pragmasiz) Calistir($"PRAGMA busy_timeout = 10000; PRAGMA foreign_keys = ON; PRAGMA journal_mode = {(AgYolu(dosya) ? "DELETE" : "WAL")};");
+        }
+
+        /// <summary>Dosya ağ paylaşımında mı (\\sunucu\klasör ya da ağ sürücüsü)?</summary>
+        public static bool AgYolu(string dosya)
+        {
+            if (dosya.StartsWith(@"\\", StringComparison.Ordinal) || dosya.StartsWith("//", StringComparison.Ordinal)) return true;
+            try { var kok = Path.GetPathRoot(Path.GetFullPath(dosya)); return !string.IsNullOrEmpty(kok) && new DriveInfo(kok).DriveType == DriveType.Network; }
+            catch { return false; }
         }
 
         static byte[] Utf8(string s) { var b = Encoding.UTF8.GetBytes(s); Array.Resize(ref b, b.Length + 1); return b; }
@@ -149,10 +160,18 @@ namespace EcoBuildss.Core.Depo
             if (rc != DONE) throw new InvalidOperationException($"Yedekleme tamamlanamadı (kod {rc}).");
         }
 
+        int islemDerinligi;
+
+        /// <summary>
+        /// İşlem (transaction). BEGIN IMMEDIATE: yazma kilidi baştan alınır; iki kişi aynı anda günlüğe yazarsa
+        /// biri bekler, aynı sıra numarasını iki kez almazlar. İç içe çağrıda dıştaki işlem geçerlidir.
+        /// </summary>
         public void Islem(Action a)
         {
-            Calistir("BEGIN");
-            try { a(); Calistir("COMMIT"); } catch { Calistir("ROLLBACK"); throw; }
+            if (islemDerinligi > 0) { islemDerinligi++; try { a(); } finally { islemDerinligi--; } return; }
+            Calistir("BEGIN IMMEDIATE");
+            islemDerinligi = 1;
+            try { a(); Calistir("COMMIT"); } catch { Calistir("ROLLBACK"); throw; } finally { islemDerinligi = 0; }
         }
 
         public void Dispose() { if (db != IntPtr.Zero) { sqlite3_close_v2(db); db = IntPtr.Zero; } }

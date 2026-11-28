@@ -174,12 +174,12 @@ namespace EcoBuildss.UI
             return k?.FullName ?? throw new DirectoryNotFoundException("veri/referans klasörü bulunamadı. Programı çözüm klasöründen ya da derleme çıktısından çalıştırın.");
         }
 
-        /// <summary>Veritabanı ve yedekler kullanıcının uygulama verisi klasöründe tutulur.</summary>
-        public static string VeriKlasoru()
-        {
-            string k = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EcoBuildss");
-            Directory.CreateDirectory(k);
-            return k;
-        }
+        /// <summary>Bu bilgisayardaki bütün Windows kullanıcılarının ortak klasörü (C:\ProgramData\EcoBuildss).</summary>
+        public static string OrtakKlasor => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "EcoBuildss");
+        static string KisiselKlasor => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "EcoBuildss");
+        public static VeriKonumu.Sonuc? Konum { get; private set; }
+
+        /// <summary>Veritabanı ve yedeklerin klasörü: yöneticinin seçtiği (ağ) klasör, yoksa bilgisayarın ortak klasörü.</summary>
+        public static string VeriKlasoru() => (Konum = VeriKonumu.Bul(OrtakKlasor, KisiselKlasor)).Klasor;
     }
 }

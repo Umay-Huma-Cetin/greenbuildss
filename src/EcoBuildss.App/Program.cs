@@ -43,7 +43,8 @@ namespace EcoBuildss.UI
                 MessageBox.Show("Veritabanı açılamadı:\n\n" + e.Message + "\n\nKullanıcı hesapları veritabanında tutulduğu için program bu durumda açılmaz.", "EcoBuildss", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return null;
             }
-            d.Db.Gunluk("Program açıldı", $"sürüm {typeof(Program).Assembly.GetName().Version} · {Environment.MachineName}");
+            d.Db.Gunluk("Program açıldı", $"sürüm {typeof(Program).Assembly.GetName().Version} · {Environment.MachineName} · {Environment.UserName} · {AnaForm.Konum?.Klasor}");
+            if (AnaForm.Konum?.Tasindi is string eski) d.Db.Gunluk("Veri ortak klasöre taşındı", $"{eski} → {AnaForm.Konum.Klasor} (eski dosya silinmedi)", Seviye.Guvenlik);
             var bozuk = ReferansButunluk.Denetle(d.Referans);
             if (bozuk.Count > 0)
             {

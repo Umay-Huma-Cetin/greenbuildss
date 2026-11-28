@@ -2,7 +2,7 @@
 
 Yalıtım ve inşaat firmaları için karar destek sistemi. Üç gerçek işi çözer:
 
-1. **Apartman mantolaması.** Bu işler kat malikleri toplantısında kazanılır ya da kaybedilir. Toplantıda herkes aynı üç şeyi sorar: daire başına ne ödeyeceğim, faturam ne kadar düşecek, kaç yılda döner. Sahada 10 dakikada bu üç sorunun cevabı ve toplantıda dağıtılacak tek sayfa çıkar; sayfa yazdırılır ya da **PDF** olarak kaydedilip WhatsApp/e-postayla gönderilir. PDF kaydedilirken müşteriye kendi notunuzu (en çok 600 karakter) yazabilirsiniz; not sayfada "Not" başlığıyla yer alır. Bir dairenin gerçek doğal gaz faturası girilirse tasarruf o faturadan hesaplanır. Ödemede 60 aya kadar taksit, aylık vade farkı ve daire başına **destek** (hibe, belediye ya da kampanya desteği) girilebilir; daire başı tutar, taksit ve geri ödeme destek düşülerek hesaplanır. Destek tutarı güncel programa göre elle girilir, programın içinde sabit bir destek varsayılmaz. Yapım yılı 2001 öncesiyse (4708 sayılı Yapı Denetimi Kanunu öncesi) mantolamadan önce riskli yapı tespiti (6306 sayılı Kanun) yaptırılması gerektiği ekranda ve toplantı sayfasında yazar.
+1. **Apartman mantolaması.** Bu işler kat malikleri toplantısında kazanılır ya da kaybedilir. Toplantıda herkes aynı üç şeyi sorar: daire başına ne ödeyeceğim, faturam ne kadar düşecek, kaç yılda döner. Sahada 10 dakikada bu üç sorunun cevabı ve toplantıda dağıtılacak tek sayfa çıkar; sayfa yazdırılır ya da **PDF** olarak kaydedilip WhatsApp/e-postayla gönderilir. PDF kaydedilirken müşteriye kendi notunuzu (en çok 600 karakter) yazabilirsiniz; not sayfada "Not" başlığıyla yer alır. Bir dairenin gerçek doğal gaz faturası girilirse tasarruf o faturadan hesaplanır. **Dış cephe mantolaması** kutusundan belirli bir malzeme (ör. taş yünü 15 cm) seçilirse orta kart o malzeme olur, yanlardaki ekonomik ve en yüksek tasarruf kartları karşılaştırma için kalır. Ödemede 60 aya kadar taksit, aylık vade farkı ve daire başına **destek** (hibe, belediye ya da kampanya desteği) girilebilir; daire başı tutar, taksit ve geri ödeme destek düşülerek hesaplanır. Destek tutarı güncel programa göre elle girilir, programın içinde sabit bir destek varsayılmaz. Yapım yılı 2001 öncesiyse (4708 sayılı Yapı Denetimi Kanunu öncesi) mantolamadan önce riskli yapı tespiti (6306 sayılı Kanun) yaptırılması gerektiği ekranda ve toplantı sayfasında yazar.
 2. **Yeni bina.** Ruhsattan önce TS 825 ve yangın yönetmeliğine uyan duvar–yalıtım–cam paketlerinden en uygun maliyetlisi; keşif, teklif ve Excel çıktısıyla.
 3. **Tekliflerim.** Verilen tekliflerin takibi: bekleyen işler, kazanma oranı, kazanılan iş. 14 günü geçip cevapsız kalan teklif "ara" diye işaretlenir; yönetici **Satışçılar** ile kişi bazında kazanma oranını görür. Kabul edilen mantolama işinde **Gerçekleşen** ile önceki ve sonraki yılın doğal gaz tüketimi (m³) girilir; söz verilen tasarrufla karşılaştırılır. Karşılaştırma TL ile değil m³ ile yapılır, çünkü tarife değişince TL faturası tasarruftan bağımsız oynar. Sonuçlar işaretlendikçe sistem firmanın kendi verisinden kazanma olasılığını öğrenir.
 
@@ -92,9 +92,16 @@ Gerekenler: Windows 10/11 ve Visual Studio 2022 (.NET 8, “.NET masaüstü geli
 2. **F5** tuşuna basın. Başlangıç projesi `EcoBuildss.App`'tir.
 3. İlk açılışta yönetici hesabınızı oluşturun.
 
-**Kurulum dosyası (setup.exe):** `kurulum\yayinla.cmd` dosyasına çift tıklayın. Sırasıyla testleri çalıştırır, programı kendi .NET'iyle tek `EcoBuildss.exe` olarak `kurulum\cikti` klasörüne yayınlar ve [Inno Setup 6.3+](https://jrsoftware.org/isdl.php) kuruluysa `kurulum\kurulum_cikti\EcoBuildss-Kurulum-3.0.0.exe` dosyasını üretir. Bu dosya .NET kurulu olmayan bilgisayara da kurulur; Başlat menüsü ve masaüstü kısayolu ekler. Kaldırınca firma verisi (`%AppData%\EcoBuildss`) silinmez. Yayın için ilk seferde internet gerekir (.NET çalışma zamanı paketleri indirilir).
+**Kurulum dosyası (setup.exe):** `kurulum\yayinla.cmd` dosyasına çift tıklayın. Sırasıyla testleri çalıştırır, programı kendi .NET'iyle tek `EcoBuildss.exe` olarak `kurulum\cikti` klasörüne yayınlar ve [Inno Setup 6.3+](https://jrsoftware.org/isdl.php) kuruluysa `kurulum\kurulum_cikti\EcoBuildss-Kurulum-3.0.0.exe` dosyasını üretir. Bu dosya .NET kurulu olmayan bilgisayara da kurulur; Başlat menüsü ve masaüstü kısayolu ekler. Kaldırınca firma verisi silinmez. Yayın için ilk seferde internet gerekir (.NET çalışma zamanı paketleri indirilir).
 
-Hiçbir NuGet paketi gerekmez. SQLite'a Windows'un kendi `winsqlite3.dll` dosyasıyla bağlanılır. `nuget.config` paket kaynaklarını kapatır, bu yüzden proje internetsiz de derlenir. Veritabanı `%AppData%\EcoBuildss\ecobuildss.db` dosyasıdır.
+Hiçbir NuGet paketi gerekmez. SQLite'a Windows'un kendi `winsqlite3.dll` dosyasıyla bağlanılır. `nuget.config` paket kaynaklarını kapatır, bu yüzden proje internetsiz de derlenir. Veritabanı `C:\ProgramData\EcoBuildss\ecobuildss.db` dosyasıdır; bilgisayardaki bütün Windows kullanıcıları aynı veriyi kullanır (eski sürümden kalan `%AppData%` verisi ilk açılışta buraya kopyalanır).
+
+## Kullanıcılar ve birden çok bilgisayar
+
+- Hesabı **yönetici açar**; kimse kendi kendine kayıt olamaz. **Veri ve modeller → Kullanıcılar → Ekle**: ad soyad, kullanıcı adı, geçici parola, rol.
+- Kullanıcı adı ve geçici parola kişiye iletilir. Kişi ilk girişte kendi parolasını belirlemek zorundadır.
+- Parolasını unutan için yönetici **Parola sıfırla** ile yeni geçici parola verir; ayrılan kişi **Etkin / pasif** ile kapatılır (kayıtları silinmez).
+- **Ofiste birkaç bilgisayar:** yönetici **Yedek → Veri konumu → Ağ klasörü seç** ile ortak bir paylaşım klasörü seçer; mevcut veri oraya tutarlı biçimde kopyalanır. Diğer bilgisayarlarda program kurulup aynı ayar yapılınca herkes aynı veritabanını kullanır. Ağ klasöründe SQLite klasik günlük kipiyle çalışır; aynı anda yazmalar sıraya girer (10 sn bekleme), günlük zinciri bozulmaz. Küçük ofis (birkaç kişi) için uygundur.
 
 ## Gerçek veriyle kullanım
 
@@ -141,7 +148,7 @@ dotnet run --project tests/EcoBuildss.Tests
 python araclar/dogrulama/bagimsiz_dogrulama.py <klasör>   # isteğe bağlı: pandas, scikit-learn
 ```
 
-124 test vardır ve şunları kapsar:
+126 test vardır ve şunları kapsar:
 - metrikler (F1, AUC, CV(RMSE))
 - regresyon ve gerçek levha fiyatları
 - enerji motoru ve yangın yönetmeliği kuralı

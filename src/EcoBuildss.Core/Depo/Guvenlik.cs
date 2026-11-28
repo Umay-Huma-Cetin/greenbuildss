@@ -507,6 +507,15 @@ CREATE TABLE IF NOT EXISTS kullanicilar (
             return yol;
         }
 
+        /// <summary>Veritabanının tutarlı kopyasını verilen dosyaya yazar (yönetici; veri klasörü değiştirilirken).</summary>
+        public void KopyaYaz(string hedefDosya)
+        {
+            Yetki(yonetici: true, "Veritabanını taşıma");
+            if (File.Exists(hedefDosya)) throw new IOException("Hedefte zaten bir veritabanı var.");
+            b.Yedekle(hedefDosya);
+            Gunluk("Veritabanı kopyalandı", hedefDosya, Seviye.Guvenlik);
+        }
+
         public List<FileInfo> Yedekler() => Directory.Exists(YedekKlasoru)
             ? new DirectoryInfo(YedekKlasoru).GetFiles("ecobuildss_*.db").OrderByDescending(f => f.LastWriteTime).ToList() : new List<FileInfo>();
 

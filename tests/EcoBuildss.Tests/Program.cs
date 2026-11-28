@@ -425,6 +425,31 @@ static class Testler
                 db.OturumKapat();
                 Dogrula(db.GirisYap("umay", "Gizli2026!") == GirisSonucu.HataliBilgi, "Eski parola artık geçmez");
             }
+            {
+                string kk = Path.Combine(Path.GetTempPath(), "ecob_konum_" + Guid.NewGuid().ToString("N"));
+                string ortak = Path.Combine(kk, "ortak"), kisisel = Path.Combine(kk, "kisisel"), ag = Path.Combine(kk, "ag");
+                Directory.CreateDirectory(kisisel); File.WriteAllText(Path.Combine(kisisel, VeriKonumu.DbAdi), "eski");
+                var k1 = VeriKonumu.Bul(ortak, kisisel);
+                bool tasindi = k1.Klasor == ortak && k1.Tasindi == kisisel && File.ReadAllText(Path.Combine(ortak, VeriKonumu.DbAdi)) == "eski" && File.Exists(Path.Combine(kisisel, VeriKonumu.DbAdi));
+                VeriKonumu.Ayarla(ortak, ag);
+                var k2 = VeriKonumu.Bul(ortak, kisisel);
+                VeriKonumu.Ayarla(ortak, null);
+                var k3 = VeriKonumu.Bul(ortak, kisisel);
+                Dogrula(tasindi && k2.Klasor == ag && k2.Secilmis && k3.Klasor == ortak && !k3.Secilmis && k3.Tasindi == null,
+                        "Veri konumu: ortak klasöre taşınır (eskisi silinmez), seçilen klasör kullanılır, geri alınabilir");
+                Directory.Delete(kk, true);
+            }
+            // Aynı dosyayı iki bağlantı (iki bilgisayar/kullanıcı) aynı anda kullanır: günlük sırası ve zinciri bozulmamalı
+            {
+                using var d1 = new Veritabani(dosya); using var d2 = new Veritabani(dosya);
+                d1.GirisYap("umay", "Yeni2026xx"); d2.GirisYap("umay", "Yeni2026xx");
+                int once = d1.GunlukOku(100000).Count;
+                var is1 = new System.Threading.Thread(() => { for (int i = 0; i < 40; i++) d1.Gunluk("Eşzamanlı deneme", "1-" + i); });
+                var is2 = new System.Threading.Thread(() => { for (int i = 0; i < 40; i++) d2.Gunluk("Eşzamanlı deneme", "2-" + i); });
+                is1.Start(); is2.Start(); is1.Join(); is2.Join();
+                Dogrula(d1.GunlukOku(100000).Count == once + 80 && d1.GunlukDogrula().sorun == null && d2.GunlukDogrula().sorun == null,
+                        "İki bağlantı aynı anda yazınca günlük kaybolmaz, zincir ve mühür bozulmaz", d1.GunlukDogrula().sorun ?? "");
+            }
             // Zincir anahtarsızdır; mühür, zincirin baştan yazılmasını ve son kayıtların silinmesini yakalar
             using (var db = new Veritabani(dosya))
             {

@@ -227,11 +227,59 @@ namespace EcoBuildss.UI
                 catch (Exception e) { d.Hata("Geri yüklenemedi: " + e.Message, e); Ui.Hata(this, "Geri yüklenemedi: " + e.Message); }
             }));
             ust.Controls.Add(Ui.Dugme("Kurtarma anahtarı", (_, __) => KurtarmaYenile()));
+            ust.Controls.Add(Ui.Dugme("Veri konumu", (_, __) => VeriKonumuDegistir()));
             ust.Controls.Add(Ui.Dugme("Klasör", (_, __) => { try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(d.Db!.YedekKlasoru) { UseShellExecute = true }); } catch { } }));
             var p = new Panel();
             p.Controls.Add(Ui.Kart("Yedekler", yedekler)); p.Controls.Add(ust);
             p.VisibleChanged += (_, __) => { if (p.Visible) Doldur(); };
             return p;
+        }
+
+        /// <summary>
+        /// Veritabanının yeri: bu bilgisayar (bütün Windows kullanıcıları) ya da ağ klasörü (ofisteki birkaç bilgisayar).
+        /// Mevcut veri yeni klasöre tutarlı biçimde kopyalanır; oradan devam etmek için program yeniden başlar.
+        /// </summary>
+        void VeriKonumuDegistir()
+        {
+            if (d.Db == null || !d.Yonetici) return;
+            string simdiki = Path.GetDirectoryName(d.Db.Dosya)!;
+            using var f = Pencere("Veri konumu", 230);
+            var p = (FlowLayoutPanel)f.Controls[0];
+            p.Controls.Add(Ui.Etiket("Şu an"));
+            p.Controls.Add(new TextBox { Text = simdiki, ReadOnly = true, Width = 300 });
+            string? secim = null; bool buBilgisayar = false;
+            var sec = Ui.Dugme("Ağ klasörü seç", (_, __) =>
+            {
+                using var fb = new FolderBrowserDialog { Description = "Ofisteki bilgisayarların ortak kullanacağı klasör" };
+                if (fb.ShowDialog(f) == DialogResult.OK) { secim = fb.SelectedPath; f.DialogResult = DialogResult.OK; }
+            }, true);
+            var yerel = Ui.Dugme("Bu bilgisayar", (_, __) => { buBilgisayar = true; f.DialogResult = DialogResult.OK; });
+            yerel.Enabled = AnaForm.Konum?.Secilmis == true;
+            p.Controls.Add(sec); p.Controls.Add(yerel);
+            if (f.ShowDialog(this) != DialogResult.OK) return;
+
+            string hedef = buBilgisayar ? AnaForm.OrtakKlasor : secim!;
+            if (string.Equals(Path.GetFullPath(hedef).TrimEnd('\\', '/'), Path.GetFullPath(simdiki).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase)) return;
+            string hedefDb = Path.Combine(hedef, VeriKonumu.DbAdi);
+            try
+            {
+                if (File.Exists(hedefDb))
+                {
+                    if (MessageBox.Show(this, "Bu klasörde zaten EcoBuildss verisi var. Oradaki veri kullanılsın mı? (Buradaki veri olduğu gibi kalır.)", "Veri konumu",
+                                        MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                }
+                else
+                {
+                    if (!VeriKonumu.Yazilabilir(hedef)) { Ui.Hata(this, "Bu klasöre yazılamıyor."); return; }
+                    d.Db.KopyaYaz(hedefDb);
+                }
+                VeriKonumu.Ayarla(AnaForm.OrtakKlasor, buBilgisayar ? null : hedef);
+                d.Db.Gunluk("Veri konumu değişti", $"{simdiki} → {hedef}", Seviye.Guvenlik);
+            }
+            catch (UnauthorizedAccessException) { Ui.Hata(this, "Bu ayar için programı kurulum dosyasıyla kurun ya da yönetici olarak çalıştırın."); return; }
+            catch (Exception e) { d.Hata("Veri konumu değiştirilemedi: " + e.Message, e); Ui.Hata(this, "Veri konumu değiştirilemedi: " + e.Message); return; }
+            MessageBox.Show(this, "Program yeni konumla yeniden açılacak.", "Veri konumu", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            Application.Restart();
         }
 
         void KurtarmaYenile()
