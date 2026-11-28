@@ -403,7 +403,8 @@ namespace EcoBuildss.UI
             {
                 var satirlar = YaziSatirlari(kesif, gerekce.Text);
                 PdfCikti.Kaydet(f, d, $"EcoBuildss_teklif_{SeciliIl.Ad}_{DateTime.Today:yyyyMMdd}.pdf", "EcoBuildss malzeme teklifi",
-                                (g, m) => TeklifSayfaCiz(g, m, satirlar), "Teklif PDF", $"{SeciliIl.Ad} · {secili?.Ad}");
+                                (g, m, not) => TeklifSayfaCiz(g, m, not.Length > 0 ? satirlar.Concat(new[] { ("", "", false), ("Not", "", true), (not, "", false) }).ToList() : satirlar),
+                                "Teklif PDF", $"{SeciliIl.Ad} · {secili?.Ad}");
             }));
             f.Controls.Add(sekme); f.Controls.Add(alt);
             f.ShowDialog(this);
@@ -488,9 +489,10 @@ namespace EcoBuildss.UI
             foreach (var (a, b, k) in satirlar)
             {
                 var ff = k ? fk : f;
-                var boyut = g.MeasureString(a, ff, (int)(w * 0.62));
-                g.DrawString(a, ff, Brushes.Black, new RectangleF(x, y, w * 0.62f, boyut.Height));
-                g.DrawString(b, ff, Brushes.Black, new RectangleF(x + w * 0.64f, y, w * 0.36f, boyut.Height));
+                float sol = b.Length == 0 ? w : w * 0.62f;   // ikinci sütunu olmayan satır (ör. not) tüm genişliği kullanır
+                var boyut = g.MeasureString(a, ff, (int)sol);
+                g.DrawString(a, ff, Brushes.Black, new RectangleF(x, y, sol, boyut.Height));
+                if (b.Length > 0) g.DrawString(b, ff, Brushes.Black, new RectangleF(x + w * 0.64f, y, w * 0.36f, boyut.Height));
                 y += Math.Max(boyut.Height, ff.Height) + 4;
             }
         }

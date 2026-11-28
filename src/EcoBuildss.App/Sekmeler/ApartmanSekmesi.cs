@@ -260,7 +260,9 @@ namespace EcoBuildss.UI
         }
 
         /// <summary>Toplantı sayfasının çizimi (yazıcı ya da PDF için).</summary>
-        void SayfaCiz(Graphics g, Rectangle m)
+        void SayfaCiz(Graphics g, Rectangle m) => SayfaCiz(g, m, "");
+
+        void SayfaCiz(Graphics g, Rectangle m, string not)
         {
             if (paketler.Count == 0 || SonSonuc == null) return;
             var (pad, s, a) = paketler[seciliIndeks]; var r = SonSonuc;
@@ -298,6 +300,7 @@ namespace EcoBuildss.UI
                 if (s.YanginNotu.Length > 0) Yaz("• " + s.YanginNotu, fYazi, Brushes.Black, 2);
                 if (Deprem.Uyari((string)yapim.SelectedItem!) is { Length: > 0 } dep) Yaz("• " + dep, fYazi, Brushes.DarkRed, 2);
                 y += 8;
+                if (not.Length > 0) { Yaz("Not", fAra, Brushes.Black, 4); Yaz(not, fYazi, Brushes.Black, 10); }
                 Yaz("Karar", fAra, Brushes.Black, 4);
                 Yaz("Kat Mülkiyeti Kanunu md. 42: ısı yalıtımı kararı kat maliklerinin sayı ve arsa payı çoğunluğuyla alınır; giderler arsa payı oranında ödenir. Daire başına tutar eşit pay varsayımıyla gösterilmiştir.", fYazi, Brushes.Black, 30);
                 g.DrawLine(Pens.Gray, x, y + 30, x + w * 0.4f, y + 30); g.DrawLine(Pens.Gray, x + w * 0.6f, y + 30, x + w, y + 30);
